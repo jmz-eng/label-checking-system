@@ -1,0 +1,63 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+
+spring:
+  config:
+    import: optional:file:./application-private.yml
+  application:
+    name: tag-management-backend
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    default-property-inclusion: non_null
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tag_management}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: TagManagementHikari
+      minimum-idle: ${DB_MIN_IDLE:2}
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:10}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath*:db/migrations/*.sql
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: "null"
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+logging:
+  level:
+    com.tagmanagement: INFO
+
+app:
+  jwt-secret: ${APP_JWT_SECRET:}
+  token-expire-hours: ${APP_TOKEN_EXPIRE_HOURS:12}
+  cors-allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
+  bootstrap-enabled: ${APP_BOOTSTRAP_ENABLED:false}
+  bootstrap-admin-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
+  bootstrap-tech-password: ${APP_BOOTSTRAP_TECH_PASSWORD:}
+  bootstrap-analyst-password: ${APP_BOOTSTRAP_ANALYST_PASSWORD:}
+  bootstrap-auditor-password: ${APP_BOOTSTRAP_AUDITOR_PASSWORD:}

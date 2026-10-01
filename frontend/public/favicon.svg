@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">标签防错管理系统图标</title>
+  <desc id="desc">蓝色圆角底上的标签、条码和核对标记</desc>
+  <rect width="64" height="64" rx="14" fill="#173B75"/>
+  <path
+    d="M18 16h22.5c1.1 0 2.1.44 2.88 1.22l5.4 5.4A4.08 4.08 0 0 1 50 25.5V46a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V20a4 4 0 0 1 4-4Z"
+    fill="#FFFFFF"
+  />
+  <path d="M40 17v7a3 3 0 0 0 3 3h7" fill="#D9E8FF"/>
+  <path d="M23 27h17" stroke="#173B75" stroke-width="3" stroke-linecap="round"/>
+  <path d="M23 35h4M32 35h2M39 35h3M23 42h2M30 42h5M40 42h2" stroke="#173B75" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="46" cy="46" r="11" fill="#16A36B"/>
+  <path d="m41.5 45.7 3.2 3.2 6.2-7" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

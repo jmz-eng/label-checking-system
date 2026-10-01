@@ -1,0 +1,38 @@
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 环境变量与日志
+.env
+.env.*
+!.env.example
+!**/.env.example
+**/application-private.yml
+**/application-production.yml
+*.pem
+*.key
+*.p12
+*.jks
+*.log
+logs/
+.playwright-mcp/
+
+# 本地业务数据备份
+/database/
+
+# Java
+backend/target/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/test-results/
+frontend/playwright-report/
+.releases/
+__pycache__/
