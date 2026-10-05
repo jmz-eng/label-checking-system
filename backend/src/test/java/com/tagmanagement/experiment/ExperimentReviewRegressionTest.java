@@ -12,6 +12,114 @@ import java.util.*;
 class ExperimentReviewRegressionTest extends ExperimentTestSupport {
     @Autowired ExperimentRepository repository;
 
+    Map<String, Object> draftBody(String source) {
+        return Map.of(
+                "kind", "ALIQUOT",
+                "animalNo", "001",
+                "timePoint", "1h",
+                "collectDate", "2026-10-05",
+                "labelInfo", "待确认血浆",
+                "purposeId", "",
+                "confirmed", false,
+                "sourceTubeId", source,
+                "requestId", UUID.randomUUID().toString());
+    }
+
+    @Test
+    void newDraftRejectsMissingExplicitSourceWithoutSavingTubeOrAudit() throws Exception {
+        String p = project();
+        mapping(p);
+        int events = repository.list("event", Long.parseLong(p)).size();
+        mvc.perform(post("/api/experiments/" + p + "/tubes")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType("application/json")
+                        .content(json.writeValueAsBytes(draftBody("missing-source"))))
+                .andExpect(status().isNotFound());
+        assertTrue(repository.list("tube", Long.parseLong(p)).isEmpty());
+        assertEquals(events, repository.list("event", Long.parseLong(p)).size());
+    }
+
+    @Test
+    void draftEditRejectsMissingSourceWithoutVoidingOriginal() throws Exception {
+        String p = project();
+        mapping(p);
+        var draft = call("/" + p + "/tubes", draftBody(""));
+        String id = draft.path("id").asText();
+        var original = repository.get("tube", id);
+        int events = repository.list("event", Long.parseLong(p)).size();
+        mvc.perform(post("/api/experiments/" + p + "/tubes/" + id)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType("application/json")
+                        .content(json.writeValueAsBytes(Map.of(
+                                "sourceTubeId", "missing-source",
+                                "reason", "选择来源",
+                                "requestId", UUID.randomUUID().toString()))))
+                .andExpect(status().isNotFound());
+        assertEquals(original, repository.get("tube", id));
+        assertEquals(1, repository.list("tube", Long.parseLong(p)).size());
+        assertEquals(events, repository.list("event", Long.parseLong(p)).size());
+    }
+
+    @Test
+    void historicalDraftWithMissingSourcePersistsFailedScan() throws Exception {
+        assertInvalidDraftScanPersistsFailure(false);
+    }
+
+    @Test
+    void historicalDraftWithMissingPurposePersistsFailedScan() throws Exception {
+        assertInvalidDraftScanPersistsFailure(true);
+    }
+
+    void assertInvalidDraftScanPersistsFailure(boolean missingPurpose) throws Exception {
+        String p = project(), u = purpose(p);
+        mapping(p);
+        var draft = call("/" + p + "/tubes", draftBody(""));
+        String tubeId = draft.path("id").asText();
+        var historical = repository.get("tube", tubeId);
+        historical.put(missingPurpose ? "purposeId" : "sourceTubeId", "missing-reference");
+        repository.save("tube", historical);
+        String s = start(p, u, "ALIQUOT").path("id").asText();
+        String raw = "  " + draft.path("code").asText() + " \n";
+        var request = Map.<String, Object>of(
+                "content", raw, "requestId", UUID.randomUUID().toString());
+        try {
+            var result = call("/sessions/" + s + "/tube", request);
+            assertEquals("FAILED", result.path("state").asText());
+            var persisted = repository.get("session", s);
+            assertEquals("FAILED", persisted.get("state"));
+            @SuppressWarnings("unchecked")
+            var last = (Map<String, Object>) persisted.get("lastResult");
+            var event = repository.get("event", last.get("id").toString());
+            assertEquals("SCAN", event.get("action"));
+            assertEquals("FAIL", event.get("result"));
+            assertEquals(raw, event.get("scannedContent"));
+            assertEquals(991L, ((Number) event.get("actorId")).longValue());
+            assertEquals("测试员", event.get("actorName"));
+            assertEquals(tubeId, event.get("targetTubeId"));
+            assertEquals(historical, event.get("actual"));
+            @SuppressWarnings("unchecked")
+            var expected = (Map<String, Object>) event.get("expected");
+            assertEquals(s, expected.get("id"));
+            assertEquals(u, expected.get("purposeId"));
+            assertEquals("2026-10-05", expected.get("collectDate"));
+            assertEquals("1h", expected.get("timePoint"));
+            assertEquals(1, ((Number) event.get("round")).intValue());
+            int count = repository.list("event", Long.parseLong(p)).size();
+            assertEquals(result, call("/sessions/" + s + "/tube", request));
+            assertEquals(count, repository.list("event", Long.parseLong(p)).size());
+            conflict("/sessions/" + s + "/next", Map.of());
+            conflict("/" + p + "/sessions", Map.of(
+                    "stage", "ALIQUOT", "purposeId", u,
+                    "collectDate", "2026-10-05", "timePoint", "1h"));
+            assertEquals("FAILED", read("/sessions/current").path("state").asText());
+        } finally {
+            // A RED run may return 404 before creating FAILED; clean up only real failures.
+            if ("FAILED".equals(repository.get("session", s).get("state")))
+                call("/sessions/" + s + "/exception-close",
+                        Map.of("remark", "历史草稿数据需修正", "confirmed", true));
+        }
+    }
+
     void conflict(String path, Map<String, Object> body) throws Exception {
         var b = new HashMap<>(body);
         b.put("requestId", UUID.randomUUID().toString());

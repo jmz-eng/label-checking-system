@@ -5,6 +5,7 @@ import static com.tagmanagement.experiment.ExperimentRepository.*;
 import com.tagmanagement.common.BusinessException;
 import com.tagmanagement.security.CurrentUserContext;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -153,13 +154,23 @@ public class ExperimentSessionService {
                                             (rs, n) -> r.decode(rs.getString(1)),
                                             content);
                     if (matches.isEmpty()) return finish(s, raw, null, "FAIL", "未知标签码");
-                    var lockedTubes =
-                            r.lockTubes(List.of(str(matches.get(0), "id"), str(s, "sourceTubeId")));
-                    var t = lockedTubes.get(str(matches.get(0), "id"));
-                    var purposeIds = new ArrayList<String>();
-                    purposeIds.add(str(s, "purposeId"));
-                    lockedTubes.values().forEach(tube -> purposeIds.add(str(tube, "purposeId")));
-                    var rules = r.lockPurposes(purposeIds);
+                    var t = matches.get(0);
+                    Map<String, Map<String, Object>> lockedTubes;
+                    Map<String, Map<String, Object>> rules;
+                    try {
+                        lockedTubes =
+                                r.lockTubes(List.of(str(t, "id"), str(s, "sourceTubeId")));
+                        t = lockedTubes.get(str(t, "id"));
+                        var purposeIds = new ArrayList<String>();
+                        purposeIds.add(str(s, "purposeId"));
+                        lockedTubes.values().forEach(tube -> purposeIds.add(str(tube, "purposeId")));
+                        rules = r.lockPurposes(purposeIds);
+                    } catch (BusinessException ex) {
+                        // Historical drafts can contain dangling references. An expected scan
+                        // failure must commit its archive and FAILED round, not roll back as 404.
+                        if (ex.getStatus() != HttpStatus.NOT_FOUND) throw ex;
+                        return finish(s, raw, t, "FAIL", "标签用途或来源不存在，须修正或异常结束");
+                    }
                     if (!data.eligible(t)) return finish(s, raw, t, "FAIL", "标签已作废、过期或用途/来源未确认");
                     String stage = str(s, "stage"), pending = str(s, "pending");
                     List<String> errors = new ArrayList<>();

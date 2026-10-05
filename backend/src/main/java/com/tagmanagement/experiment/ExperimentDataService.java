@@ -266,9 +266,10 @@ public class ExperimentDataService {
         } else confirmed = false;
         row.put("confirmed", confirmed);
         row.put("sourceTubeId", kind.equals("COLLECTION") ? "" : str(row, "sourceTubeId"));
-        if (kind.equals("ALIQUOT") && confirmed) {
+        if (kind.equals("ALIQUOT")) {
             String source = str(row, "sourceTubeId");
-            if (source.isEmpty()) {
+            if (!source.isEmpty()) validateSource(p, row, source);
+            else if (confirmed) {
                 var parents =
                         r.list("tube", p).stream()
                                 .filter(
@@ -279,7 +280,7 @@ public class ExperimentDataService {
                                                         && tuple(row, t))
                                 .toList();
                 if (parents.size() == 1) row.put("sourceTubeId", parents.get(0).get("id"));
-            } else validateSource(p, row, source);
+            }
         }
         row.put("code", "E" + Base64.getUrlEncoder().withoutPadding().encodeToString(uuidBytes()));
         row.put("status", "ACTIVE");
