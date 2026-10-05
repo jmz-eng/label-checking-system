@@ -89,6 +89,9 @@ public class SampleTaskService {
     @Transactional
     public ScanResultResponse bind(BindScanRequest request) {
         SampleTask task = findTaskForScan(request.getLabelCode(), BusinessConstants.SCAN_BIND);
+        if (task == null) {
+            return new ScanResultResponse(false, "标签码不存在，请检查是否扫错标签", null, null);
+        }
         AnimalInfo animal = animalMapper.selectById(task.getAnimalId());
         String expected = expectedSummary(task);
         String payload = "animalNo=" + request.getAnimalNo();
@@ -119,6 +122,9 @@ public class SampleTaskService {
     @Transactional
     public ScanResultResponse verify(VerifyScanRequest request) {
         SampleTask task = findTaskForScan(request.getLabelCode(), BusinessConstants.SCAN_VERIFY);
+        if (task == null) {
+            return new ScanResultResponse(false, "标签码不存在，请检查是否扫错标签", null, null);
+        }
         ProjectInfo project = projectMapper.selectById(task.getProjectId());
         AnimalInfo animal = animalMapper.selectById(task.getAnimalId());
         String expected = expectedSummary(task);
@@ -146,7 +152,11 @@ public class SampleTaskService {
             return new ScanResultResponse(false, message, task.getStatus(), toResponse(task));
         }
 
-        if (!BusinessConstants.TASK_RECORDED.equals(task.getStatus())) {
+        if (!List.of(BusinessConstants.TASK_BOUND, BusinessConstants.TASK_VERIFIED,
+                BusinessConstants.TASK_RECORDED).contains(task.getStatus())) {
+            throw BusinessException.conflict("样本须先完成贴标绑定，不能跳过状态核对");
+        }
+        if (BusinessConstants.TASK_BOUND.equals(task.getStatus())) {
             task.setStatus(BusinessConstants.TASK_VERIFIED);
             task.setVerifiedBy(CurrentUserContext.get().getId());
             task.setVerifiedAt(LocalDateTime.now());
@@ -161,11 +171,17 @@ public class SampleTaskService {
     @Transactional
     public ScanResultResponse record(RecordScanRequest request) {
         SampleTask task = findTaskForScan(request.getLabelCode(), BusinessConstants.SCAN_RECORD);
+        if (task == null) {
+            return new ScanResultResponse(false, "标签码不存在，请检查是否扫错标签", null, null);
+        }
         if (BusinessConstants.TASK_VOIDED.equals(task.getStatus())) {
             throw BusinessException.conflict("标签已作废，不能录入");
         }
-        if (BusinessConstants.TASK_PRINTED.equals(task.getStatus())) {
-            throw BusinessException.conflict("样本还未完成贴标绑定，不能录入");
+        if (BusinessConstants.TASK_RECORDED.equals(task.getStatus())) {
+            return new ScanResultResponse(true, "样本已录入，保留原确认人员和时间", task.getStatus(), toResponse(task));
+        }
+        if (!BusinessConstants.TASK_VERIFIED.equals(task.getStatus())) {
+            throw BusinessException.conflict("样本须先核对通过，不能录入");
         }
         task.setStatus(BusinessConstants.TASK_RECORDED);
         task.setRecordedBy(CurrentUserContext.get().getId());
@@ -236,7 +252,7 @@ public class SampleTaskService {
     private SampleTask findTaskForScan(String labelCode, String actionType) {
         String code = labelCode.trim();
         SampleTask task = sampleTaskMapper.selectOne(new LambdaQueryWrapper<SampleTask>()
-                .eq(SampleTask::getLabelCode, code));
+                .eq(SampleTask::getLabelCode, code).last("FOR UPDATE"));
         if (task == null) {
             ScanRecord record = new ScanRecord();
             record.setLabelCode(code);
@@ -247,7 +263,7 @@ public class SampleTaskService {
             record.setMessage("标签码不存在");
             record.setOperatorId(CurrentUserContext.getUserIdOrNull());
             scanRecordMapper.insert(record);
-            throw BusinessException.notFound("标签码不存在，请检查是否扫错标签");
+            return null;
         }
         return task;
     }
