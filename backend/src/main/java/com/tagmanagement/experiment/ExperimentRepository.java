@@ -31,6 +31,12 @@ public class ExperimentRepository {
         this.jdbc = jdbc;
         this.json = json;
         tx = new TransactionTemplate(tm);
+        // Every validation read after waiting for a row lock must see committed changes.
+        // Do not inherit MySQL's REPEATABLE READ snapshot established by request lookup.
+        tx.setIsolationLevel(
+                org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        tx.setPropagationBehavior(
+                org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public JdbcTemplate jdbc() {
@@ -118,6 +124,35 @@ public class ExperimentRepository {
                         id);
         if (rows.isEmpty()) throw BusinessException.notFound(type + " 不存在");
         return rows.get(0);
+    }
+
+    public Map<String, Object> scopedLock(String type, long p, String id) {
+        var row = lock(type, id);
+        if (number(row.get("projectId")) != p) throw BusinessException.notFound("当前实验中不存在该数据");
+        return row;
+    }
+
+    /**
+     * Shared order: actor, optional project/session, sorted tubes, sorted purposes, mapping. Tube
+     * content/source identity is immutable; corrections always create a new identity.
+     */
+    public Map<String, Map<String, Object>> lockTubes(Collection<String> ids) {
+        var sorted = new TreeSet<String>();
+        for (String id : ids) {
+            if (id == null || id.isBlank()) continue;
+            sorted.add(id);
+            String source = str(get("tube", id), "sourceTubeId");
+            if (!source.isBlank()) sorted.add(source);
+        }
+        var rows = new LinkedHashMap<String, Map<String, Object>>();
+        for (String id : sorted) rows.put(id, lock("tube", id));
+        return rows;
+    }
+
+    public Map<String, Map<String, Object>> lockPurposes(Collection<String> ids) {
+        var rows = new LinkedHashMap<String, Map<String, Object>>();
+        for (String id : new TreeSet<>(ids)) if (!id.isBlank()) rows.put(id, lock("purpose", id));
+        return rows;
     }
 
     public List<Map<String, Object>> list(String type, long project) {

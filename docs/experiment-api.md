@@ -106,6 +106,13 @@ interface ImportBatch {
   createdAt:string; status:'PREVIEW'|'INVALID'|'REJECTED'|'COMMITTED'; duplicate:boolean;
   rows:ImportRow[]; issues:ImportIssue[]; commitIssues?:ImportIssue[];
   entityIds?:string[]; confirmedRows?:ImportRow[];
+  duplicateBatches?:{importId:string; fileName:string; status:string}[];
+  duplicateRows?:{
+    rowKey:string; tubeId:string; importId:string; content:ImportRow;
+    sourceSheet?:string; sourceRow?:number; status?:'ACTIVE'|'VOID'; matchingRowKey?:string;
+  }[];
+  duplicateRowsLimit?:number; // 当前10000，达到上限时列表可能未穷尽
+
 }
 interface ImportCommit {
   requestId:string; confirmed:true; acknowledgeDuplicate?:boolean;
@@ -118,7 +125,10 @@ interface ImportCommit {
 - 真正支持 xls/xlsx，原文件完整存数据库。上限8MB、20张表、总10000条数据。全空行不算数据；非空行不会静默跳过。公式/Excel错误单元格不接受；长数字、科学计数或非整数标识给单元格错误，建议文本格式。日期支持真实Excel日期或严格yyyy-MM-dd文本。
 - issues非空禁止提交，修正附件后重新预览。REJECTED表示确认/关系问题，无任何行已导入；在同批次上补充assignments，用新requestId重试。
 - suggestedPurposeId是建议，只有confirmed=true的最终提交才确认它；空建议行必须用assignments显式指定。同元组多个采血管必须显式给分装行sourceTubeId。
-- duplicate按当前实验文件SHA-256检测（包括先前预览）；需acknowledgeDuplicate=true。合法相同内容的两行生成两支不同管，不合并。分组的重复动物/芯片仍然是错误，更正使用映射编辑，不冒充追加。
+- duplicate按当前实验文件SHA-256检测（包括其他未提交预览，排除自身）；duplicateBatches列出匹配批次。duplicateRows按同管类型及五个原始字段精确比较，提示已存在管子（含作废历史）及本附件内相同行；重新保存Excel或换文件名仍会命中内容警告。tubeId/importId为空表示本附件另一行或手工创建管子，matchingRowKey指本附件被匹配行；content保留本行五项信息。最多返回10000条候选，不是完整去重清单。
+- commit在项目行锁内重新检查上述两类重复；任一命中且未acknowledgeDuplicate=true均返回HTTP409，零行插入。预览时无重复也可能在提交时发现新重复。客户端收到此409后调用GET批次详情取得最新duplicate/duplicateBatches/duplicateRows，展示实际候选，请用户明确确认追加，再以新requestId和acknowledgeDuplicate=true提交。普通confirmed=true只确认用途/配对，不能代替重复追加确认。GET详情会即时计算未提交批次的重复情况；列表为保存时快照。
+- 明确确认后合法相同内容的每一行均生成独立管子，不自动合并、覆盖或丢弃。分组重复动物/芯片仍是错误，更正使用映射编辑，不冒充追加。
+- 预览与提交共用字段长度限制：试验编号/动物号64，芯片号128，时间点/管标信息2000字符。超长预览为INVALID并标明sheet/row/column；旧批次提交时再次校验，发现问题返回REJECTED和commitIssues，不插入部分数据。
 - 同批次成功提交后再次用原requestId取得原结果；新requestId重提已成功批次返回409。
 
 ## 服务端会话与两阶段核对
@@ -127,7 +137,7 @@ interface ImportCommit {
 
 | 方法与相对路径 | 请求/结果 |
 |---|---|
-| GET `/sessions/current` | 当前账号最近未替代/未异常结束会话，或 `{}` |
+| GET `/sessions/current` | 当前账号唯一未替代会话（含ABORTED），或 `{}` |
 | POST `/{p}/sessions` | `{requestId,stage,collectDate,timePoint,purposeId}` → Session |
 | GET `/sessions/{id}` | Session，刷新后恢复服务端状态 |
 | POST `/sessions/{id}/chip` | `{requestId,content}` → Session |
@@ -151,7 +161,7 @@ COLLECTION开始后pending=CHIP，识别芯片后pending=COLLECTION_TUBE，再�
 
 FAIL将state保存为FAILED；next和任何实验的新session都被阻断。同动物和预期条件下可重扫纠正；READY仅表示芯片/来源接收成功，不能清除既有FAILED。纠正PASS后允许next。关系版本变更将pending切回CHIP，必须重扫当前动物的最新芯片；旧快照仍在历史。用途规则变更要求异常结束并新选上下文。
 
-exception-close必须非空原因和confirmed=true，保存ABORT，state=ABORTED，绝不产生采血PASS。之后可新session或next。next仅允许PASSED/ABORTED；采血清空动物并强制重新扫芯片。分装retainSource=true保留当前来源用于下一支分装管，否则重新扫描来源。新建会话会将非失败旧会话标为SUPERSEDED并留上下文变更记录。
+exception-close必须非空原因和confirmed=true，保存ABORT，state=ABORTED，绝不产生采血PASS。之后可新session或next。next仅允许PASSED/ABORTED；采血清空动物并强制重新扫芯片。分装retainSource=true保留当前来源用于下一支分装管，否则重新扫描来源。新建会话会将所有非失败旧会话（包括ABORTED）标为SUPERSEDED并留上下文变更记录，旧ABORT证据保留。scan/next/exception-close只能操作当前会话；旧页面对已替代会话操作返回409。任意其他未解决FAILED也会阻断scan/next，不能借旧会话切换动物或上下文。
 
 lastResult在next后保留上一条不可变结果供历史展示；必须结合state/round/pending呈现，不能将上一轮PASS当作新轮成功。
 
@@ -195,3 +205,9 @@ interface Event {
 7. 启动凭据/令牌密钥继续由环境或application-private.yml提供。新接口复用现有权限；管理员按现有角色管理授权。未验证真实MySQL服务器迁移、实体打印或部署。
 
 运行：`mvn -f backend/pom.xml test`。网络重试/并发测试使用真实HTTP控制器、权限拦截器、事务及H2持久化；没有将新的业务服务替换为mock。
+
+## 事务与并发约定
+
+实验写操作明确使用READ_COMMITTED及独立事务，不继承数据库默认REPEATABLE_READ；requestId检查之后等待项目锁，不会继续使用旧快照。映射、用途、管子、批次的更改均以SELECT FOR UPDATE返回的当前行为输入，管更正保留并发打印登记后的原管快照。
+
+共同锁顺序为账号行 → 管理操作的项目行/扫描的会话行 → 按id排序的全部涉及管子（含来源）→ 按id排序的用途 → 映射。扫描和打印不锁项目行；操作员各自会话独立，同一来源的同时使用通过细粒度行锁串行验证。批量更正预先锁定全部目标/来源，避免与批量打印或来源核对形成反向锁等待。数据管理操作的项目锁保证创建/配对/导入时的映射、用途、来源验证一致。

@@ -119,13 +119,16 @@ public class ExperimentImportService {
                                                     i + 1,
                                                     headers[col]);
                                     row.put(keys[col], value);
-                                    if (value.isBlank())
+                                    try {
+                                        ExperimentDataService.bounded(keys[col], value);
+                                    } catch (BusinessException e) {
                                         issue(
                                                 issues,
                                                 sheet.getSheetName(),
                                                 i + 1,
                                                 headers[col],
-                                                "必填");
+                                                e.getMessage());
+                                    }
                                 }
                                 if (!str(project, "projectCode").equals(str(row, "projectCode")))
                                     issue(
@@ -238,6 +241,7 @@ public class ExperimentImportService {
                                     rows,
                                     "issues",
                                     issues));
+                    refreshDuplicates(p, batch);
                     r.save("import", batch);
                     r.jdbc()
                             .update(
@@ -312,12 +316,15 @@ public class ExperimentImportService {
                 b,
                 () -> {
                     r.lockProject(p);
-                    var batch = r.scoped("import", p, id);
+                    var batch = r.scopedLock("import", p, id);
                     if ("COMMITTED".equals(batch.get("status")))
                         throw BusinessException.conflict("批次已提交");
                     if (!yes(b, "confirmed")) throw BusinessException.badRequest("需确认用途及配对");
-                    if (yes(batch, "duplicate") && !yes(b, "acknowledgeDuplicate"))
-                        throw BusinessException.conflict("重复文件须明确确认追加");
+                    refreshDuplicates(p, batch);
+                    if ((yes(batch, "duplicate")
+                                    || !((List<?>) batch.get("duplicateRows")).isEmpty())
+                            && !yes(b, "acknowledgeDuplicate"))
+                        throw BusinessException.conflict("检测到重复文件或疑似重复行，请刷新批次详情核对后明确确认追加");
                     List<Map<String, Object>> issues =
                             new ArrayList<>((List<Map<String, Object>>) batch.get("issues"));
                     if (!issues.isEmpty()) throw BusinessException.badRequest("附件仍有错误，须修正后重新上传");
@@ -337,6 +344,24 @@ public class ExperimentImportService {
                         var row = r.copy(original);
                         String sheet = str(row, "sourceSheet");
                         int index = (int) number(row.get("sourceRow"));
+                        String[] keys =
+                                kind.equals("GROUP")
+                                        ? new String[] {"projectCode", "animalNo", "chipNo"}
+                                        : new String[] {
+                                            "projectCode",
+                                            "animalNo",
+                                            "timePoint",
+                                            "labelInfo",
+                                            "collectDate"
+                                        };
+                        String[] columns = kind.equals("GROUP") ? GROUP : TUBES;
+                        for (int c = 0; c < keys.length; c++) {
+                            try {
+                                ExperimentDataService.bounded(keys[c], str(row, keys[c]));
+                            } catch (BusinessException e) {
+                                issue(issues, sheet, index, columns[c], e.getMessage());
+                            }
+                        }
                         try {
                             if (kind.equals("GROUP")) {
                                 for (var m : r.list("mapping", p))
@@ -426,6 +451,99 @@ public class ExperimentImportService {
                                     yes(b, "acknowledgeDuplicate")));
                     return batch;
                 });
+    }
+
+    /**
+     * Recomputed on GET and again under the project lock before insertion. Preview flags are
+     * advisory.
+     */
+    public Map<String, Object> detail(long p, String id) {
+        var batch = r.scoped("import", p, id);
+        if (!"COMMITTED".equals(batch.get("status"))) refreshDuplicates(p, batch);
+        return batch;
+    }
+
+    private String rowIdentity(Map<String, Object> row, String kind) {
+        return r.encode(
+                List.of(
+                        kind,
+                        str(row, "projectCode"),
+                        str(row, "animalNo"),
+                        str(row, "timePoint"),
+                        str(row, "labelInfo"),
+                        str(row, "collectDate")));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void refreshDuplicates(long p, Map<String, Object> batch) {
+        String id = str(batch, "id"), kind = str(batch, "kind");
+        var matchingBatches =
+                r.list("import", p).stream()
+                        .filter(
+                                other ->
+                                        !id.equals(str(other, "id"))
+                                                && str(batch, "hash").equals(str(other, "hash")))
+                        .map(
+                                other ->
+                                        fields(
+                                                "importId",
+                                                other.get("id"),
+                                                "fileName",
+                                                other.get("fileName"),
+                                                "status",
+                                                other.get("status")))
+                        .toList();
+        batch.put("duplicate", !matchingBatches.isEmpty());
+        batch.put("duplicateBatches", matchingBatches);
+        List<Map<String, Object>> warnings = new ArrayList<>();
+        if (!kind.equals("GROUP")) {
+            Map<String, List<Map<String, Object>>> index = new HashMap<>();
+            for (var tube : r.list("tube", p)) {
+                if (id.equals(str(tube, "importId")) && !id.isBlank()) continue;
+                index.computeIfAbsent(
+                                rowIdentity(tube, str(tube, "kind")), ignored -> new ArrayList<>())
+                        .add(tube);
+            }
+            Map<String, String> seen = new HashMap<>();
+            for (var row : (List<Map<String, Object>>) batch.get("rows")) {
+                String key = rowIdentity(row, kind);
+                for (var tube : index.getOrDefault(key, List.of())) {
+                    if (warnings.size() >= 10000) break;
+                    warnings.add(
+                            fields(
+                                    "rowKey",
+                                    row.get("rowKey"),
+                                    "tubeId",
+                                    tube.get("id"),
+                                    "importId",
+                                    str(tube, "importId"),
+                                    "sourceSheet",
+                                    str(tube, "sourceSheet"),
+                                    "sourceRow",
+                                    tube.getOrDefault("sourceRow", 0),
+                                    "status",
+                                    tube.get("status"),
+                                    "content",
+                                    row));
+                }
+                String previous = seen.putIfAbsent(key, str(row, "rowKey"));
+                if (previous != null && warnings.size() < 10000)
+                    warnings.add(
+                            fields(
+                                    "rowKey",
+                                    row.get("rowKey"),
+                                    "tubeId",
+                                    "",
+                                    "importId",
+                                    id,
+                                    "matchingRowKey",
+                                    previous,
+                                    "content",
+                                    row));
+            }
+        }
+        batch.put("duplicateRows", warnings);
+        batch.put("duplicateRowsLimit", 10000);
     }
 
     public byte[] original(long p, String id) {

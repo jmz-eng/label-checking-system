@@ -162,7 +162,7 @@ public class ExperimentController {
     @GetMapping("/{p}/imports/{id}")
     @RequirePermission("sample:generate")
     public ApiResponse<?> batch(@PathVariable long p, @PathVariable String id) {
-        return ApiResponse.ok(r.scoped("import", p, id));
+        return ApiResponse.ok(imports.detail(p, id));
     }
 
     @PostMapping(value = "/{p}/imports/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -52,10 +52,7 @@ public class ExperimentSessionService {
 
     public Map<String, Object> current() {
         return own().stream()
-                .filter(
-                        s ->
-                                !"ABORTED".equals(s.get("state"))
-                                        && !"SUPERSEDED".equals(s.get("state")))
+                .filter(s -> !"SUPERSEDED".equals(s.get("state")))
                 .findFirst()
                 .map(
                         s -> {
@@ -63,6 +60,18 @@ public class ExperimentSessionService {
                             return s;
                         })
                 .orElse(Map.of());
+    }
+
+    private void authoritative(Map<String, Object> session) {
+        var current = own().stream().filter(s -> !"SUPERSEDED".equals(s.get("state"))).findFirst();
+        if (current.isEmpty() || !str(current.get(), "id").equals(str(session, "id")))
+            throw BusinessException.conflict("会话已被新会话替代，请刷新当前会话");
+        if (own().stream()
+                .anyMatch(
+                        s ->
+                                "FAILED".equals(s.get("state"))
+                                        && !str(s, "id").equals(str(session, "id"))))
+            throw BusinessException.conflict("尚有其他失败轮次，须先纠正或异常结束");
     }
 
     public Map<String, Object> start(long p, Map<String, Object> b) {
@@ -81,7 +90,7 @@ public class ExperimentSessionService {
                     String time = required(b, "timePoint"), purpose = required(b, "purposeId");
                     var rule = data.activePurpose(p, purpose);
                     for (var old : own())
-                        if (!Set.of("ABORTED", "SUPERSEDED").contains(str(old, "state"))) {
+                        if (!"SUPERSEDED".equals(str(old, "state"))) {
                             var before = r.copy(old);
                             old.put("state", "SUPERSEDED");
                             r.save("session", old);
@@ -128,6 +137,7 @@ public class ExperimentSessionService {
                 () -> {
                     var s = r.lock("session", id);
                     owner(s);
+                    authoritative(s);
                     if (Set.of("PASSED", "ABORTED", "SUPERSEDED").contains(str(s, "state")))
                         throw BusinessException.conflict("本轮已结束，请开始下一轮");
                     required(b, "content");
@@ -143,16 +153,22 @@ public class ExperimentSessionService {
                                             (rs, n) -> r.decode(rs.getString(1)),
                                             content);
                     if (matches.isEmpty()) return finish(s, raw, null, "FAIL", "未知标签码");
-                    var t = r.lock("tube", str(matches.get(0), "id"));
+                    var lockedTubes =
+                            r.lockTubes(List.of(str(matches.get(0), "id"), str(s, "sourceTubeId")));
+                    var t = lockedTubes.get(str(matches.get(0), "id"));
+                    var purposeIds = new ArrayList<String>();
+                    purposeIds.add(str(s, "purposeId"));
+                    lockedTubes.values().forEach(tube -> purposeIds.add(str(tube, "purposeId")));
+                    var rules = r.lockPurposes(purposeIds);
                     if (!data.eligible(t)) return finish(s, raw, t, "FAIL", "标签已作废、过期或用途/来源未确认");
                     String stage = str(s, "stage"), pending = str(s, "pending");
                     List<String> errors = new ArrayList<>();
                     for (String key : List.of("projectId", "collectDate", "timePoint", "purposeId"))
                         if (!str(s, key).equals(str(t, key))) errors.add(key + "不一致");
-                    var rule = r.lock("purpose", str(s, "purposeId"));
+                    var rule = rules.get(str(s, "purposeId"));
                     if (!r.encode(rule).equals(r.encode(s.get("purposeSnapshot"))))
                         errors.add("用途规则已变更，请异常结束后重新选择");
-                    validateStage(s, t, p, stage, pending, errors);
+                    validateStage(s, t, p, stage, pending, errors, lockedTubes);
                     if (!errors.isEmpty())
                         return finish(s, raw, t, "FAIL", String.join("；", errors));
                     if (stage.equals("ALIQUOT") && pending.equals("SOURCE_TUBE")) {
@@ -173,7 +189,8 @@ public class ExperimentSessionService {
             long p,
             String stage,
             String pending,
-            List<String> errors) {
+            List<String> errors,
+            Map<String, Map<String, Object>> lockedTubes) {
         if (stage.equals("COLLECTION")) {
             if (!"COLLECTION".equals(t.get("kind"))) errors.add("应扫描采血管");
             if (!str(s, "animalNo").equals(str(t, "animalNo"))) errors.add("动物号不一致");
@@ -204,7 +221,7 @@ public class ExperimentSessionService {
             if (!"ALIQUOT".equals(t.get("kind"))) errors.add("应扫描分装管");
             if (!str(s, "sourceTubeId").equals(str(t, "sourceTubeId"))) errors.add("分装管不属于当前来源管");
             if (!str(s, "animalNo").equals(str(t, "animalNo"))) errors.add("动物号不一致");
-            var source = r.lock("tube", str(s, "sourceTubeId"));
+            var source = lockedTubes.get(str(s, "sourceTubeId"));
             if (!data.eligible(source) || !sourcePassed(p, str(source, "id")))
                 errors.add("当前来源管失效");
         }
@@ -296,6 +313,7 @@ public class ExperimentSessionService {
                 () -> {
                     var s = r.lock("session", id);
                     owner(s);
+                    authoritative(s);
                     if (!Set.of("PASSED", "ABORTED").contains(str(s, "state")))
                         throw BusinessException.conflict("当前轮未通过或异常结束");
                     boolean keep =
@@ -329,6 +347,7 @@ public class ExperimentSessionService {
                 () -> {
                     var s = r.lock("session", id);
                     owner(s);
+                    authoritative(s);
                     if (!"FAILED".equals(s.get("state")))
                         throw BusinessException.conflict("仅失败轮可异常结束");
                     String reason = required(b, "remark");

@@ -7,13 +7,16 @@ import com.fasterxml.jackson.databind.*;
 import com.tagmanagement.entity.SysUser;
 import com.tagmanagement.security.TokenService;
 
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.ByteArrayOutputStream;
 import java.util.*;
 
 @SpringBootTest(
@@ -143,5 +146,39 @@ abstract class ExperimentTestSupport {
                         "1h",
                         "purposeId",
                         purpose));
+    }
+
+    byte[] excel(String[] headers, String[] values) throws Exception {
+        try (var w = new XSSFWorkbook();
+                var out = new ByteArrayOutputStream()) {
+            var s = w.createSheet("样表");
+            var h = s.createRow(0);
+            for (int i = 0; i < headers.length; i++) h.createCell(i).setCellValue(headers[i]);
+            var r = s.createRow(1);
+            for (int i = 0; i < values.length; i++) r.createCell(i).setCellValue(values[i]);
+            w.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    com.fasterxml.jackson.databind.JsonNode upload(String p, byte[] bytes, String kind)
+            throws Exception {
+        return json.readTree(
+                        mvc.perform(
+                                        multipart("/api/experiments/" + p + "/imports/preview")
+                                                .file(
+                                                        new MockMultipartFile(
+                                                                "file",
+                                                                "tubes.xlsx",
+                                                                "application/octet-stream",
+                                                                bytes))
+                                                .param("kind", kind)
+                                                .param("requestId", UUID.randomUUID().toString())
+                                                .header("Authorization", "Bearer " + token))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString())
+                .path("data");
     }
 }

@@ -60,13 +60,13 @@ public class ExperimentDataService {
     }
 
     Map<String, Object> writeMapping(long p, String id, Map<String, Object> b, boolean remove) {
-        Map<String, Object> before = id == null ? Map.of() : r.scoped("mapping", p, id);
+        Map<String, Object> before = id == null ? Map.of() : r.scopedLock("mapping", p, id);
         if (id != null) required(b, "reason");
         var row = new LinkedHashMap<String, Object>(before);
         String animal = remove ? str(before, "animalNo") : required(b, "animalNo"),
                 chip = remove ? str(before, "chipNo") : required(b, "chipNo");
-        if (animal.length() > 64 || chip.length() > 128)
-            throw BusinessException.badRequest("动物号或芯片号过长");
+        bounded("animalNo", animal);
+        bounded("chipNo", chip);
         for (var other : r.list("mapping", p))
             if (yes(other, "active")
                     && !Objects.equals(id, other.get("id"))
@@ -108,7 +108,8 @@ public class ExperimentDataService {
                 () -> {
                     r.project(p);
                     r.lockProject(p);
-                    var before = id == null ? Map.<String, Object>of() : r.scoped("purpose", p, id);
+                    var before =
+                            id == null ? Map.<String, Object>of() : r.scopedLock("purpose", p, id);
                     var row = new LinkedHashMap<String, Object>(before);
                     if (id != null) required(b, "reason");
                     if (!remove) {
@@ -170,6 +171,17 @@ public class ExperimentDataService {
                 .orElseThrow(() -> BusinessException.badRequest("动物号没有有效芯片对应关系"));
     }
 
+    static void bounded(String key, String value) {
+        int max =
+                switch (key) {
+                    case "animalNo", "projectCode" -> 64;
+                    case "chipNo" -> 128;
+                    default -> 2000;
+                };
+        if (value.isBlank() || value.length() > max)
+            throw BusinessException.badRequest(key + " 必填且长度不可超过" + max);
+    }
+
     static void date(String date) {
         try {
             if (!LocalDate.parse(date).toString().equals(date)) throw new Exception();
@@ -190,9 +202,8 @@ public class ExperimentDataService {
     }
 
     Map<String, Object> writeTube(long p, String id, Map<String, Object> b, String action) {
-        var before = id == null ? Map.<String, Object>of() : r.scoped("tube", p, id);
+        var before = id == null ? Map.<String, Object>of() : r.scopedLock("tube", p, id);
         if (id != null) {
-            r.lock("tube", id);
             required(b, "reason");
             if (!"ACTIVE".equals(before.get("status"))) throw BusinessException.conflict("原管已作废");
         }
@@ -234,6 +245,7 @@ public class ExperimentDataService {
         String kind = required(row, "kind");
         if (!Set.of("COLLECTION", "ALIQUOT").contains(kind))
             throw BusinessException.badRequest("管类型错误");
+        bounded("animalNo", required(row, "animalNo"));
         animal(p, required(row, "animalNo"));
         required(row, "timePoint");
         required(row, "labelInfo");
@@ -348,6 +360,9 @@ public class ExperimentDataService {
                     Object v = b.get("assignments");
                     if (!(v instanceof List<?> rows) || rows.isEmpty() || rows.size() > 1000)
                         throw BusinessException.badRequest("assignments需1至1000行");
+                    var tubeIds = new ArrayList<String>();
+                    for (Object o : rows) tubeIds.add(required((Map<String, Object>) o, "tubeId"));
+                    r.lockTubes(tubeIds);
                     List<Map<String, Object>> out = new ArrayList<>();
                     for (Object o : rows) {
                         Map<String, Object> row = new LinkedHashMap<>((Map<String, Object>) o);
@@ -369,10 +384,13 @@ public class ExperimentDataService {
                     Object ids = b.get("tubeIds");
                     if (!(ids instanceof List<?> list) || list.isEmpty() || list.size() > 1000)
                         throw BusinessException.badRequest("tubeIds需1至1000项");
+                    var locked = r.lockTubes((List<String>) list);
+                    r.lockPurposes(locked.values().stream().map(t -> str(t, "purposeId")).toList());
                     List<Map<String, Object>> snapshots = new ArrayList<>();
                     for (String id : new TreeSet<>((List<String>) list)) {
-                        var t = r.scoped("tube", p, id);
-                        t = r.lock("tube", id);
+                        var t = locked.get(id);
+                        if (number(t.get("projectId")) != p)
+                            throw BusinessException.notFound("当前实验中不存在该数据");
                         if (!eligible(t)) throw BusinessException.conflict("仅可打印有效且用途/来源已确认的管子");
                         snapshots.add(r.copy(t));
                         t.put("printed", true);

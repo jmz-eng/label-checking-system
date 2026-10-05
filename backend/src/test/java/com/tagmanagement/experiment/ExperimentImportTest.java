@@ -4,26 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.io.ByteArrayOutputStream;
 import java.util.*;
 
 class ExperimentImportTest extends ExperimentTestSupport {
-    byte[] excel(String[] headers, String[] values) throws Exception {
-        try (var w = new XSSFWorkbook();
-                var out = new ByteArrayOutputStream()) {
-            var s = w.createSheet("样表");
-            var h = s.createRow(0);
-            for (int i = 0; i < headers.length; i++) h.createCell(i).setCellValue(headers[i]);
-            var r = s.createRow(1);
-            for (int i = 0; i < values.length; i++) r.createCell(i).setCellValue(values[i]);
-            w.write(out);
-            return out.toByteArray();
-        }
-    }
 
     @Test
     void realExcelGroupPreviewCommitOriginalAndDuplicate() throws Exception {
@@ -160,26 +146,5 @@ class ExperimentImportTest extends ExperimentTestSupport {
                         .path("status")
                         .asText());
         assertEquals(2, read("/" + p + "/tubes").size());
-    }
-
-    com.fasterxml.jackson.databind.JsonNode upload(String p, byte[] bytes, String kind)
-            throws Exception {
-        return json.readTree(
-                        mvc.perform(
-                                        multipart("/api/experiments/" + p + "/imports/preview")
-                                                .file(
-                                                        new MockMultipartFile(
-                                                                "file",
-                                                                "tubes.xlsx",
-                                                                "application/octet-stream",
-                                                                bytes))
-                                                .param("kind", kind)
-                                                .param("requestId", UUID.randomUUID().toString())
-                                                .header("Authorization", "Bearer " + token))
-                                .andExpect(status().isOk())
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString())
-                .path("data");
     }
 }
