@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, Input, Pagination, Space, Table, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { experimentPath } from '../../api/experiments';
 import { http } from '../../api/http';
@@ -37,6 +37,15 @@ export function PrintPanel({
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
+  const mounted = useRef(true);
+  const printing = useRef(false);
+  const [openingPrint, setOpeningPrint] = useState(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
@@ -56,36 +65,57 @@ export function PrintPanel({
       active = false;
     };
   }, [projectId, allowed]);
-  const command = useCommand<PrintRequest>(
-    async (response, _path, body) => {
-      if (response.status !== 'REQUEST_ACKNOWLEDGED') {
-        setError('服务器未确认打印请求，请重新读取记录。');
-        return;
-      }
-      setNotice(
-        `已登记打印请求 ${response.id}，共 ${response.tubes.length} 支。请在打印窗口确认设备与纸张；取消窗口也不代表实际打印完成。`,
-      );
-      const invalid = response.tubes.filter((t) => createTubeLabelLayout(t).error);
-      if (invalid.length) {
-        setError('服务器返回的标签包含过长内容，请重新预览。已登记请求，但未打开打印。');
-        return;
-      }
-      const requestedIds = (body.tubeIds as string[] | undefined) ?? selected;
-      const ids = requestedIds.length ? requestedIds : response.tubes.map((tube) => tube.id);
-      const ordered = ids
-        .map((id) => response.tubes.find((tube) => tube.id === id))
-        .filter((tube): tube is Tube => !!tube);
-      if (ordered.length !== ids.length) {
-        setError('打印请求已登记，但标签清单不完整，请读取请求记录后重新预览。');
-        return;
-      }
+  async function openSavedRequest(response: PrintRequest, requestedIds?: string[]) {
+    if (!mounted.current || printing.current) return;
+    if (response.status !== 'REQUEST_ACKNOWLEDGED') {
+      setError('服务器未确认打印请求，请重新读取记录。');
+      return;
+    }
+    setNotice(
+      `已登记打印请求 ${response.id}，共 ${response.tubes.length} 支。请在打印窗口确认设备与纸张；取消窗口也不代表实际打印完成。`,
+    );
+    const invalid = response.tubes.filter((t) => createTubeLabelLayout(t).error);
+    if (invalid.length) {
+      setError('服务器返回的标签包含过长内容，请重新预览。已登记请求，但未打开打印。');
+      return;
+    }
+    const ids = requestedIds?.length ? requestedIds : response.tubes.map((tube) => tube.id);
+    const ordered = ids
+      .map((id) => response.tubes.find((tube) => tube.id === id))
+      .filter((tube): tube is Tube => !!tube);
+    if (ordered.length !== ids.length) {
+      setError('打印请求已登记，但标签清单不完整，请读取请求记录后重新预览。');
+      return;
+    }
+    printing.current = true;
+    setOpeningPrint(true);
+    setError('');
+    try {
       setPrintTubes(ordered);
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       );
-      window.print();
+      // Leaving this panel cancels the intent, even after the POST was committed.
+      if (
+        mounted.current &&
+        document.querySelector('#experiment-print-root .experiment-print-page')
+      )
+        window.print();
+    } finally {
+      printing.current = false;
+      if (mounted.current) setOpeningPrint(false);
+    }
+  }
+  const command = useCommand<PrintRequest>(
+    async (response, _path, body) => {
+      if (!mounted.current) return;
+      await openSavedRequest(response, body.tubeIds as string[] | undefined);
+      if (!mounted.current) return;
       await refresh();
-      setHistory(await http.get<PrintRequest[]>(`${experimentPath(projectId)}/print-requests`));
+      const requests = await http.get<PrintRequest[]>(
+        `${experimentPath(projectId)}/print-requests`,
+      );
+      if (mounted.current) setHistory(requests);
     },
     undefined,
     `${projectId}:print`,
@@ -97,21 +127,27 @@ export function PrintPanel({
     const error = createTubeLabelLayout(t).error;
     return error ? [{ tube: t, error }] : [];
   });
-  function ineligible(t: Tube): string {
+  function basicIneligible(t: Tube): string {
     if (t.status !== 'ACTIVE') return '已作废';
     if (!t.confirmed || !t.purposeId) return '用途未确认';
     if (!purposes.some((p) => p.id === t.purposeId && p.active && p.confirmed)) return '用途已停用';
     if (t.expiresAt && new Date(t.expiresAt).getTime() <= now) return '已过期';
-    if (
-      t.kind === 'ALIQUOT' &&
-      (!t.sourceTubeId || !tubes.some((s) => s.id === t.sourceTubeId && s.status === 'ACTIVE'))
-    )
-      return '来源待确认或已失效';
+    return '';
+  }
+  function ineligible(t: Tube): string {
+    const reason = basicIneligible(t);
+    if (reason) return reason;
+    if (t.kind === 'ALIQUOT') {
+      const source = tubes.find((s) => s.id === t.sourceTubeId && s.kind === 'COLLECTION');
+      if (!source) return '来源待确认或已失效';
+      const sourceReason = basicIneligible(source);
+      if (sourceReason) return `来源${sourceReason}`;
+    }
     return '';
   }
   const invalid = selectedTubes.filter((t) => ineligible(t));
   const missing = selected.filter((id) => !tubes.some((t) => t.id === id));
-  const busy = command.busy || !!command.pending || !allowed;
+  const busy = command.busy || !!command.pending || openingPrint || !allowed;
   const rows = tubes.filter(
     (t) =>
       (!kind || t.kind === kind) &&
@@ -309,6 +345,14 @@ export function PrintPanel({
           { title: '操作账号', dataIndex: 'actorId' },
           { title: '管数', render: (_, p) => p.tubes.length },
           { title: '状态', render: () => '已登记请求（实体打印结果未确认）' },
+          {
+            title: '恢复打印窗口',
+            render: (_, request) => (
+              <Button disabled={busy} onClick={() => void openSavedRequest(request)}>
+                打开已登记请求 {request.id}
+              </Button>
+            ),
+          },
         ]}
       />
       {!!printTubes.length &&

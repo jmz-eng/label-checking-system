@@ -91,7 +91,14 @@ type Handler = (
   method: string,
   query: URLSearchParams,
 ) => unknown | Promise<unknown>;
-async function open(page: Page, tab = 'groups', handler?: Handler, permissions = ['*']) {
+async function open(
+  page: Page,
+  tab = 'groups',
+  handler?: Handler,
+  permissions = ['*'],
+  modelSessionWrites = true,
+) {
+  let savedSession: unknown;
   page.on('pageerror', (error) => console.error('PAGE ERROR:', error.message));
   await page.route(/^http:\/\/127\.0\.0\.1:5175\/api\//, async (route) => {
     const u = new URL(route.request().url());
@@ -150,6 +157,23 @@ async function open(page: Page, tab = 'groups', handler?: Handler, permissions =
         data = batch;
       else if (u.pathname.endsWith('/sessions')) data = session;
     }
+    // Normal fixtures model committed state as well as the operation response.
+    // Cache-response regressions disable this and supply current state explicitly.
+    if (
+      modelSessionWrites &&
+      method === 'POST' &&
+      data &&
+      typeof data === 'object' &&
+      'pending' in data
+    )
+      savedSession = data;
+    if (
+      modelSessionWrites &&
+      method === 'GET' &&
+      u.pathname.endsWith('/sessions/current') &&
+      savedSession
+    )
+      data = savedSession;
     await route.fulfill({ json: { code: 200, data } });
   });
   await page.addInitScript(() => localStorage.setItem('tag-management-token', 'test-token'));
@@ -1043,5 +1067,205 @@ for (const action of [
       ['project:view'],
     );
     await expect(page.getByRole('button', { name: '重试原操作' })).toBeDisabled();
+  });
+}
+
+for (const replacement of [false, true]) {
+  test(`缓存200 PASS重试必须读取当前${replacement ? '替代会话' : '更高轮'}FAILED`, async ({
+    page,
+  }) => {
+    const initial = { ...session, pending: 'COLLECTION_TUBE', animalNo: '001' };
+    const cached = {
+      ...initial,
+      state: 'PASSED',
+      pending: 'NONE',
+      lastResult: { id: 'old-pass', round: 1, result: 'PASS', message: '旧轮一致', actual: tube },
+    };
+    const latest = {
+      ...initial,
+      id: replacement ? 's2' : 's1',
+      round: replacement ? 1 : 2,
+      state: 'FAILED',
+      lastResult: {
+        id: 'latest-fail',
+        round: replacement ? 1 : 2,
+        result: 'FAIL',
+        message: '当前管不符',
+        actual: aliquot,
+      },
+    };
+    let current = initial as unknown;
+    const bodies: Body[] = [];
+    await open(
+      page,
+      'collection',
+      (path, body) => {
+        if (
+          path.endsWith('/sessions/current') ||
+          path.endsWith('/sessions/s1') ||
+          path.endsWith('/sessions/s2')
+        )
+          return current;
+        if (path.endsWith('/tube')) {
+          bodies.push(body);
+          current = latest;
+          return bodies.length === 1 ? 'NETWORK' : cached;
+        }
+      },
+      ['*'],
+      false,
+    );
+    await page.getByLabel('扫描内容').fill(tube.code);
+    await page.getByLabel('扫描内容').press('Enter');
+    await expect(page.getByRole('button', { name: '重试原操作' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId('scan-state')).toHaveClass(/failed/);
+    await page.getByRole('button', { name: '重试原操作' }).click();
+    await expect(page.getByRole('button', { name: '重试原操作' })).toHaveCount(0);
+    await expect(page.getByTestId('scan-state')).toContainText('核对失败');
+    await expect(page.getByTestId('scan-state')).not.toHaveClass(/passed/);
+    await expect(page.getByText('当前管不符', { exact: true })).toBeVisible();
+    await expect(page.getByText('旧轮一致', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '下一轮' })).toBeDisabled();
+    expect(bodies[1]).toEqual(bodies[0]);
+  });
+}
+
+test('已保存扫码后当前读取失败保持原身份原码且关闭绿色通过，恢复重试安全', async ({ page }) => {
+  const cached = {
+    ...session,
+    state: 'PASSED',
+    pending: 'NONE',
+    lastResult: { id: 'pass', round: 1, result: 'PASS', message: '核对一致', actual: tube },
+  };
+  let committed = false;
+  let unavailable = true;
+  const bodies: Body[] = [];
+  await open(
+    page,
+    'collection',
+    (path, body) => {
+      if (path.endsWith('/sessions/current'))
+        return committed
+          ? unavailable
+            ? 'NETWORK'
+            : cached
+          : { ...session, pending: 'COLLECTION_TUBE' };
+      if (path.endsWith('/sessions/s1')) return { ...session, pending: 'COLLECTION_TUBE' };
+      if (path.endsWith('/tube')) {
+        bodies.push(body);
+        committed = true;
+        return cached;
+      }
+    },
+    ['*'],
+    false,
+  );
+  await page.getByLabel('扫描内容').fill(tube.code);
+  await page.getByLabel('扫描内容').press('Enter');
+  await expect(page.getByRole('button', { name: '重试原操作' })).toBeVisible();
+  await expect(page.getByLabel('扫描内容')).toHaveValue(tube.code);
+  await expect(page.getByTestId('scan-state')).not.toHaveClass(/passed/);
+  await expect(page.getByText('核对一致', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '下一轮' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '开始采血核对' })).toBeDisabled();
+  unavailable = false;
+  await page.getByRole('button', { name: '重试原操作' }).click();
+  await expect(page.getByTestId('scan-state')).toContainText('核对通过');
+  await expect(page.getByLabel('扫描内容')).toHaveValue('');
+  expect(bodies[1]).toEqual(bodies[0]);
+});
+
+test('延迟打印POST切页后不自动打印，返回显式打开已登记请求且不重复提交', async ({ page }) => {
+  let release = () => {};
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const saved = {
+    id: 'saved-print',
+    status: 'REQUEST_ACKNOWLEDGED',
+    tubes: [tube],
+    createdAt: tube.createdAt,
+  };
+  let committed = false;
+  let posts = 0;
+  await open(page, 'print', async (path, _body, method) => {
+    if (!path.endsWith('/print-requests')) return undefined;
+    if (method === 'GET') return committed ? [saved] : [];
+    posts++;
+    committed = true;
+    await wait;
+    return saved;
+  });
+  await page.evaluate(() => {
+    (window as unknown as { printEvidence: number[] }).printEvidence = [];
+    window.print = () => {
+      (window as unknown as { printEvidence: number[] }).printEvidence.push(
+        document.querySelectorAll('#experiment-print-root .experiment-print-page').length,
+      );
+    };
+  });
+  await page.getByRole('checkbox', { name: '选择标签 t1' }).check();
+  await page.getByRole('button', { name: '登记打印请求并打开打印' }).click();
+  await expect.poll(() => posts).toBe(1);
+  await page.getByRole('tab', { name: '采血管', exact: true }).click();
+  release();
+  await expect
+    .poll(() => page.evaluate(() => sessionStorage.getItem('experiment-action:1:7:print')))
+    .toBeNull();
+  // Flush the two animation frames that previously caused the unmounted print.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  expect(
+    await page.evaluate(() => (window as unknown as { printEvidence: number[] }).printEvidence),
+  ).toEqual([]);
+  await page.getByRole('tab', { name: '标签打印', exact: true }).click();
+  await page.getByRole('button', { name: '打开已登记请求 saved-print' }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { printEvidence: number[] }).printEvidence),
+    )
+    .toEqual([1]);
+  expect(posts).toBe(1);
+});
+
+test('通过后重选条件隐藏旧绿色提示和实际管子', async ({ page }) => {
+  const passed = {
+    ...session,
+    state: 'PASSED',
+    pending: 'NONE',
+    animalNo: '001',
+    lastResult: { id: 'pass', round: 1, result: 'PASS', message: '核对一致', actual: tube },
+  };
+  await open(page, 'collection', (path) =>
+    path.endsWith('/sessions/current') || path.endsWith('/sessions/s1') ? passed : undefined,
+  );
+  await expect(page.getByTestId('scan-state')).toHaveClass(/passed/);
+  await page.getByRole('button', { name: '重新选择采样条件' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '确认重新选择' }).click();
+  await expect(page.getByTestId('scan-state')).not.toHaveClass(/passed/);
+  await expect(page.getByText('核对一致', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('实际扫描管子（本次保存快照）', { exact: true })).toHaveCount(0);
+});
+
+test('管子批量选择明确覆盖全部筛选结果', async ({ page }) => {
+  const tubes = Array.from({ length: 21 }, (_, i) => ({ ...tube, id: `bulk-${i}` }));
+  await open(page, 'collection-tubes', (path) => (path.endsWith('/tubes') ? tubes : undefined));
+  await page.getByRole('checkbox', { name: '选择筛选结果（最多1000支）', exact: true }).check();
+  await expect(page.getByText('已选 21 支', { exact: false })).toBeVisible();
+});
+
+for (const source of [
+  { ...tube, expiresAt: '2020-01-01T00:00:00Z', reason: '来源已过期' },
+  { ...tube, confirmed: false, reason: '来源用途未确认' },
+]) {
+  test(`分装打印${source.reason}不可勾选并显示原因`, async ({ page }) => {
+    await open(page, 'print', (path) => (path.endsWith('/tubes') ? [source, aliquot] : undefined));
+    await expect(page.getByRole('checkbox', { name: '选择标签 t2' })).toBeDisabled();
+    await expect(page.getByText(source.reason, { exact: true })).toBeVisible();
   });
 }

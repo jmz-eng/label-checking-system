@@ -240,7 +240,7 @@ export function TubesPanel({
           {
             title: (
               <Checkbox
-                aria-label="选择本页有效管子"
+                aria-label="选择筛选结果（最多1000支）"
                 checked={
                   !!rows.length &&
                   rows.filter((t) => t.status === 'ACTIVE').every((t) => selected.includes(t.id))

@@ -89,14 +89,22 @@ export function ScanPanel({
     }
   }
   const command = useCommand<Session>(
-    (next) => {
-      accept(next);
+    async () => {
+      // An idempotent POST can return a saved response from an older round/session.
+      // Only the current-session lookup may establish the displayed current state.
+      setLoaded(false);
+      setRestoreError('');
+      const current = await experimentApi.currentSession();
+      if (!alive.current) return;
+      if (current.id) accept(current as Session);
+      else setSession(null);
+      setLoaded(true);
       setContent('');
       setValidation('');
       setRemark('');
       setClosing(false);
       setReselecting(false);
-      beep(next.state === 'FAILED');
+      beep(current.state === 'FAILED');
       setTimeout(() => input.current?.focus(), 0);
     },
     async () => {
@@ -108,6 +116,7 @@ export function ScanPanel({
       }
     },
     'scanner',
+    true,
   );
   async function restore() {
     const sequence = ++restoreSequence.current;
@@ -217,6 +226,11 @@ export function ScanPanel({
     setClosing(true);
   }
   const passed =
+    loaded &&
+    !restoreError &&
+    !reselecting &&
+    !command.busy &&
+    !command.pending &&
     matching &&
     session.state === 'PASSED' &&
     session.lastResult?.result === 'PASS' &&
@@ -237,13 +251,15 @@ export function ScanPanel({
                 ? '等待确认保存结果'
                 : pendingNames[session.pending];
   const result =
-    matching &&
-    session.lastResult?.round !== undefined &&
-    session.lastResult.round !== session.round
+    reselecting || !loaded || !!restoreError || !!command.pending || command.busy
       ? undefined
-      : matching
-        ? session.lastResult
-        : undefined;
+      : matching &&
+          session.lastResult?.round !== undefined &&
+          session.lastResult.round !== session.round
+        ? undefined
+        : matching
+          ? session.lastResult
+          : undefined;
   return (
     <Space direction="vertical" className="page-stack" size="middle">
       <Typography.Title level={4}>
@@ -391,7 +407,7 @@ export function ScanPanel({
           </Checkbox>
         </Space>
       </div>
-      {matching && session.sourceSnapshot && (
+      {matching && !reselecting && loaded && !command.pending && session.sourceSnapshot && (
         <div className="content-panel">
           <Typography.Title level={5}>当前来源采血管（本轮快照）</Typography.Title>
           <TubeFields tube={session.sourceSnapshot} />

@@ -87,6 +87,7 @@ export function useCommand<T>(
   onSuccess: (data: T, path: string, body: Record<string, unknown>) => void | Promise<void>,
   onReject?: (error: ApiError, path: string) => void | Promise<void>,
   durableKey?: string,
+  retainOnSuccessFailure = false,
 ) {
   const { user } = useAuth();
   const storageKey = durableKey ? `experiment-action:${user?.id}:${durableKey}` : undefined;
@@ -139,11 +140,14 @@ export function useCommand<T>(
       setBusy(false);
       return;
     }
-    remember(null);
     try {
       await onSuccess(data, action.path, action.body);
+      remember(null);
     } catch (caught) {
-      setError(`操作已保存，重新加载资料失败：${errorText(caught)}`);
+      remember(retainOnSuccessFailure ? action : null);
+      setError(
+        `操作已保存，重新加载资料失败：${errorText(caught)}${retainOnSuccessFailure ? '。结果未确认，请重试原操作。' : ''}`,
+      );
     }
     running.current = false;
     setBusy(false);
