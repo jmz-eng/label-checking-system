@@ -1,5 +1,5 @@
 import { Alert, Button, Descriptions, Space, Typography } from 'antd';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, http } from '../../api/http';
 import { useAuth } from '../../stores/AuthContext';
 import type { Purpose, Tube } from '../../types/experiments';
@@ -101,56 +101,90 @@ export function useCommand<T>(
   });
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
+  const mounted = useRef(true);
+  const lifecycle = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    running.current = false;
+    const generation = ++lifecycle.current;
+    return () => {
+      mounted.current = false;
+      lifecycle.current = generation + 1;
+    };
+  }, []);
   const [error, setError] = useState(pending ? '结果未确认，请重试原操作以取得保存结果。' : '');
-  const remember = (action: Pending | null) => {
+  const remember = (action: Pending | null, writeStorage = true) => {
     setPending(action);
-    if (storageKey) {
+    if (storageKey && writeStorage) {
       try {
         if (action) sessionStorage.setItem(storageKey, JSON.stringify(action));
         else sessionStorage.removeItem(storageKey);
+        return true;
       } catch {
         // The in-memory action still permits a safe retry when browser storage is unavailable.
       }
     }
+    return false;
   };
   async function perform(action: Pending) {
-    if (running.current) return;
+    if (running.current || !mounted.current) return;
+    const generation = lifecycle.current;
+    const active = () => mounted.current && generation === lifecycle.current;
+    let persisted = false;
+    const canSettle = () => {
+      if (!active()) return false;
+      if (!storageKey || !persisted) return true;
+      try {
+        const stored = JSON.parse(sessionStorage.getItem(storageKey) || 'null') as Pending | null;
+        return stored?.path === action.path && stored.body.requestId === action.body.requestId;
+      } catch {
+        // With unavailable storage, the mounted instance can still settle its in-memory action.
+        return true;
+      }
+    };
     running.current = true;
     setBusy(true);
     setError('');
-    remember(action);
-    let data: T;
+    persisted = remember(action);
     try {
-      data = await http.post<T, Record<string, unknown>>(action.path, action.body);
-    } catch (caught) {
-      const failure = caught instanceof ApiError ? caught : new ApiError(errorText(caught));
-      if (failure.uncertain) {
-        remember(action);
-        setError(`结果未确认：${failure.message}。可重试本次提交。`);
-      } else {
-        remember(null);
-        setError(failure.message);
-        try {
-          await onReject?.(failure, action.path);
-        } catch (refreshFailure) {
-          setError(`${failure.message}；重新读取结果失败：${errorText(refreshFailure)}`);
+      let data: T;
+      try {
+        data = await http.post<T, Record<string, unknown>>(action.path, action.body);
+      } catch (caught) {
+        if (!canSettle()) return;
+        const failure = caught instanceof ApiError ? caught : new ApiError(errorText(caught));
+        if (failure.uncertain) {
+          remember(action, persisted);
+          setError(`结果未确认：${failure.message}。可重试本次提交。`);
+        } else {
+          remember(null, persisted);
+          setError(failure.message);
+          try {
+            await onReject?.(failure, action.path);
+          } catch (refreshFailure) {
+            if (active())
+              setError(`${failure.message}；重新读取结果失败：${errorText(refreshFailure)}`);
+          }
         }
+        return;
       }
-      running.current = false;
-      setBusy(false);
-      return;
+      if (!canSettle()) return;
+      try {
+        await onSuccess(data, action.path, action.body);
+        if (canSettle()) remember(null, persisted);
+      } catch (caught) {
+        if (!canSettle()) return;
+        remember(retainOnSuccessFailure ? action : null, persisted);
+        setError(
+          `操作已保存，重新加载资料失败：${errorText(caught)}${retainOnSuccessFailure ? '。结果未确认，请重试原操作。' : ''}`,
+        );
+      }
+    } finally {
+      if (active()) {
+        running.current = false;
+        setBusy(false);
+      }
     }
-    try {
-      await onSuccess(data, action.path, action.body);
-      remember(null);
-    } catch (caught) {
-      remember(retainOnSuccessFailure ? action : null);
-      setError(
-        `操作已保存，重新加载资料失败：${errorText(caught)}${retainOnSuccessFailure ? '。结果未确认，请重试原操作。' : ''}`,
-      );
-    }
-    running.current = false;
-    setBusy(false);
   }
   return {
     busy,
