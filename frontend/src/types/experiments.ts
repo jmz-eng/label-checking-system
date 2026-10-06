@@ -82,6 +82,12 @@ export interface ImportRow {
   suggestedPurposeId?: string;
   requiresConfirmation?: boolean;
 }
+export interface ConfirmedImportRow extends ImportRow {
+  purposeId?: string;
+  sourceTubeId?: string;
+  confirmed?: boolean;
+  importId?: string;
+}
 export interface ImportBatch {
   id: string;
   projectId: number;
@@ -96,7 +102,7 @@ export interface ImportBatch {
   issues: ImportIssue[];
   commitIssues?: ImportIssue[];
   entityIds?: string[];
-  confirmedRows?: ImportRow[];
+  confirmedRows?: ConfirmedImportRow[];
   duplicateBatches?: { importId: string; fileName: string; status: string }[];
   duplicateRows?: {
     rowKey: string;

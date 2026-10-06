@@ -415,6 +415,64 @@ test('提交409重新取最新疑似重复行，明确追加才新请求提交',
   expect(commits[1].acknowledgeDuplicate).toBe(true);
   expect(commits[0].requestId).not.toBe(commits[1].requestId);
 });
+test('已提交分装批次回看显示最终用途和明确来源，停用作废后仍保留身份', async ({ page }) => {
+  const finalPurpose = { ...purpose, id: 'p2', name: '生化' };
+  const sourceA = { ...tube, id: 'source-a', purposeId: 'p2' };
+  const sourceB = { ...sourceA, id: 'source-b', labelInfo: '生化原血' };
+  const previewBatch = { ...batch, kind: 'ALIQUOT', rows: [{ ...batch.rows[0], labelInfo: '血浆' }] };
+  let saved: typeof previewBatch & { confirmedRows?: Body[] } = previewBatch;
+  let committed = false;
+  let archived = false;
+  let reopened = 0;
+  await open(page, 'imports', (path, body, method) => {
+    if (path.endsWith('/purposes'))
+      return [purpose, { ...finalPurpose, active: !archived }];
+    if (path.endsWith('/tubes'))
+      return [sourceA, { ...sourceB, status: archived ? 'VOID' : 'ACTIVE' }];
+    if (path.endsWith('/imports/preview')) return previewBatch;
+    if (path.endsWith('/imports')) return [saved];
+    if (path.endsWith('/commit')) {
+      expect(body.confirmed).toBe(true);
+      expect(body.assignments).toEqual([
+        { rowKey: 'Sheet1:2', purposeId: 'p2', sourceTubeId: 'source-b' },
+      ]);
+      committed = true;
+      saved = {
+        ...previewBatch,
+        status: 'COMMITTED',
+        confirmedRows: [{ ...previewBatch.rows[0], purposeId: 'p2', sourceTubeId: 'source-b', confirmed: true }],
+      };
+      return saved;
+    }
+    if (path.endsWith('/imports/b1') && method === 'GET') {
+      reopened++;
+      return saved;
+    }
+  });
+  await upload(page);
+  await expect(page.getByLabel('用途 Sheet1:2', { exact: true })).toHaveValue('p1');
+  await page.getByLabel('用途 Sheet1:2', { exact: true }).selectOption('p2');
+  await expect(page.getByLabel('来源 Sheet1:2', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: '确认用途并追加导入' })).toBeDisabled();
+  await page.getByLabel('来源 Sheet1:2', { exact: true }).selectOption('source-b');
+  await page.getByRole('button', { name: '确认用途并追加导入' }).click();
+  await expect(page.getByText('已完整导入', { exact: true }).first()).toBeVisible();
+  expect(committed).toBe(true);
+  archived = true;
+  await page.reload();
+  await page.getByRole('button', { name: '查看批次' }).click();
+  await expect(page.getByLabel('用途 Sheet1:2', { exact: true })).toContainText('生化');
+  await expect(page.getByLabel('用途 Sheet1:2', { exact: true })).toContainText('p2');
+  await expect(page.getByLabel('用途 Sheet1:2', { exact: true })).toContainText('已停用');
+  await expect(page.getByLabel('来源 Sheet1:2', { exact: true })).toContainText('生化原血');
+  await expect(page.getByLabel('来源 Sheet1:2', { exact: true })).toContainText('source-b');
+  await expect(page.getByLabel('来源 Sheet1:2', { exact: true })).toContainText('已作废');
+  await expect(page.getByLabel('用途 Sheet1:2', { exact: true })).not.toHaveJSProperty('tagName', 'SELECT');
+  await expect(page.getByLabel('来源 Sheet1:2', { exact: true })).not.toHaveJSProperty('tagName', 'SELECT');
+  await expect(page.getByRole('button', { name: '确认用途并追加导入' })).toBeDisabled();
+  await expect(page.getByText('有分装行的来源不唯一或缺失，请明确选择来源采血管。')).toHaveCount(0);
+  expect(reopened).toBe(1);
+});
 test('用途归类与歧义配对批量确认，保存响应后刷新新管身份', async ({ page }) => {
   let assignment: Body | undefined;
   await open(page, 'aliquot-tubes', (path, body) => {

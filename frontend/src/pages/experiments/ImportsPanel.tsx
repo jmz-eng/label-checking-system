@@ -84,7 +84,12 @@ export function ImportsPanel({
     setMessage('');
     setAssignments(
       Object.fromEntries(
-        value.rows.map((row) => [row.rowKey, { purposeId: row.suggestedPurposeId || '' }]),
+        value.status === 'COMMITTED'
+          ? (value.confirmedRows || []).map((row) => [
+              row.rowKey,
+              { purposeId: row.purposeId || '', sourceTubeId: row.sourceTubeId },
+            ])
+          : value.rows.map((row) => [row.rowKey, { purposeId: row.suggestedPurposeId || '' }]),
       ),
     );
   }
@@ -93,6 +98,7 @@ export function ImportsPanel({
       setBatch(value);
       setAcknowledge(false);
       if (value.status === 'COMMITTED') {
+        showBatch(value);
         setMessage('已完整导入');
         await refresh();
         await loadHistory();
@@ -188,8 +194,11 @@ export function ImportsPanel({
     setMessage(`已对 ${selected.length} 行设置用途建议，请确认后提交。`);
   }
   const noPurpose =
-    batch?.kind !== 'GROUP' && batch?.rows.some((row) => !assignments[row.rowKey]?.purposeId);
+    batch?.status !== 'COMMITTED' &&
+    batch?.kind !== 'GROUP' &&
+    batch?.rows.some((row) => !assignments[row.rowKey]?.purposeId);
   const needsSource =
+    batch?.status !== 'COMMITTED' &&
     batch?.kind === 'ALIQUOT' &&
     batch.rows.some(
       (row) =>
@@ -364,7 +373,7 @@ export function ImportsPanel({
               </Checkbox>
             </div>
           )}
-          {batch.kind !== 'GROUP' && (
+          {batch.kind !== 'GROUP' && batch.status !== 'COMMITTED' && (
             <Space wrap className="experiment-toolbar">
               <NativeSelect
                 label="批量用途"
@@ -396,7 +405,7 @@ export function ImportsPanel({
                 />
               )}
               <Button
-                disabled={busy || !selected.length || batch.status === 'COMMITTED'}
+                disabled={busy || !selected.length}
                 onClick={applyBulk}
               >
                 应用到选中行（{selected.length}）
@@ -452,21 +461,33 @@ export function ImportsPanel({
                     },
                     { title: '采样日期', dataIndex: 'collectDate' },
                     {
-                      title: '用途识别（需确认）',
-                      render: (_: unknown, r: ImportRow) => (
-                        <NativeSelect
-                          label={`用途 ${r.rowKey}`}
-                          value={assignments[r.rowKey]?.purposeId || ''}
-                          disabled={busy || batch.status === 'COMMITTED'}
-                          onChange={(v) =>
-                            setAssignments((prev) => ({
-                              ...prev,
-                              [r.rowKey]: { purposeId: v },
-                            }))
-                          }
-                          options={purposeOptions(purposes)}
-                        />
-                      ),
+                      title: batch.status === 'COMMITTED' ? '已确认用途' : '用途识别（需确认）',
+                      render: (_: unknown, r: ImportRow) => {
+                        const purposeId = assignments[r.rowKey]?.purposeId || '';
+                        if (batch.status === 'COMMITTED') {
+                          const definition = purposes.find((p) => p.id === purposeId);
+                          return (
+                            <span aria-label={`用途 ${r.rowKey}`}>
+                              {definition ? `${definition.name} · ${purposeId}` : purposeId || '—'}
+                              {definition && !definition.active ? ' · 已停用' : ''}
+                            </span>
+                          );
+                        }
+                        return (
+                          <NativeSelect
+                            label={`用途 ${r.rowKey}`}
+                            value={purposeId}
+                            disabled={busy}
+                            onChange={(v) =>
+                              setAssignments((prev) => ({
+                                ...prev,
+                                [r.rowKey]: { purposeId: v },
+                              }))
+                            }
+                            options={purposeOptions(purposes)}
+                          />
+                        );
+                      },
                     },
                   ]),
               ...(batch.kind === 'ALIQUOT'
@@ -474,6 +495,16 @@ export function ImportsPanel({
                     {
                       title: '明确来源采血管',
                       render: (_: unknown, r: ImportRow) => {
+                        if (batch.status === 'COMMITTED') {
+                          const sourceId = assignments[r.rowKey]?.sourceTubeId || '';
+                          const source = tubes.find((t) => t.id === sourceId);
+                          return (
+                            <span aria-label={`来源 ${r.rowKey}`}>
+                              {source ? `${source.labelInfo} · ${sourceId}` : sourceId || '—'}
+                              {source?.status === 'VOID' ? ' · 已作废' : ''}
+                            </span>
+                          );
+                        }
                         const options = sourceOptions(r, assignments[r.rowKey]?.purposeId || '');
                         return (
                           <NativeSelect
@@ -483,7 +514,7 @@ export function ImportsPanel({
                             }
                             value={assignments[r.rowKey]?.sourceTubeId || ''}
                             options={options}
-                            disabled={busy || batch.status === 'COMMITTED'}
+                            disabled={busy}
                             onChange={(v) =>
                               setAssignments((prev) => ({
                                 ...prev,

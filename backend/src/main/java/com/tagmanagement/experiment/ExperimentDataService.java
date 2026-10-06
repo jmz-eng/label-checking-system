@@ -335,20 +335,26 @@ public class ExperimentDataService {
     }
 
     boolean eligible(Map<String, Object> t) {
-        if (!"ACTIVE".equals(t.get("status")) || !yes(t, "confirmed")) return false;
         try {
-            activePurpose(number(t.get("projectId")), str(t, "purposeId"));
-            if (!str(t, "expiresAt").isEmpty()
-                    && java.time.Instant.parse(str(t, "expiresAt"))
-                            .isBefore(java.time.Instant.now())) return false;
+            if (!basicEligible(t)) return false;
             if ("ALIQUOT".equals(t.get("kind"))) {
                 if (str(t, "sourceTubeId").isEmpty()) return false;
                 validateSource(number(t.get("projectId")), t, str(t, "sourceTubeId"));
+                return basicEligible(
+                        r.scoped("tube", number(t.get("projectId")), str(t, "sourceTubeId")));
             }
             return true;
         } catch (BusinessException ex) {
             return false;
         }
+    }
+
+    private boolean basicEligible(Map<String, Object> t) {
+        if (!"ACTIVE".equals(t.get("status")) || !yes(t, "confirmed")) return false;
+        activePurpose(number(t.get("projectId")), str(t, "purposeId"));
+        return str(t, "expiresAt").isEmpty()
+                || !java.time.Instant.parse(str(t, "expiresAt"))
+                        .isBefore(java.time.Instant.now());
     }
 
     @SuppressWarnings("unchecked")
