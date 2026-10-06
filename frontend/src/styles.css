@@ -21,9 +21,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    linear-gradient(120deg, rgba(23, 87, 194, 0.08), transparent 42%),
-    #f4f6fa;
+  background: linear-gradient(120deg, rgba(23, 87, 194, 0.08), transparent 42%), #f4f6fa;
 }
 
 .route-loading {
@@ -591,7 +589,7 @@ body {
   margin-bottom: 16px;
 }
 
-.label-card-button[aria-pressed="true"] .label-preview {
+.label-card-button[aria-pressed='true'] .label-preview {
   outline: 2px solid #2563eb;
 }
 
@@ -803,7 +801,8 @@ body {
 }
 
 @media print {
-  html, body {
+  html,
+  body {
     width: 25mm !important;
     height: 10mm !important;
     min-width: 0 !important;
@@ -839,6 +838,234 @@ body {
   }
 
   #label-print-root .label-artwork {
+    width: 25mm;
+    height: 10mm;
+  }
+}
+
+.mobile-menu-toggle {
+  display: none;
+}
+.legacy-workflow-note {
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 6px;
+}
+.experiment-page-title,
+.experiment-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.experiment-page-title h2,
+.experiment-section-title h4 {
+  margin: 0 !important;
+}
+.experiment-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+.experiment-field > span {
+  color: #475467;
+  font-size: 13px;
+}
+.experiment-field select,
+.experiment-workspace .ant-form-item select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  max-width: 420px;
+}
+.experiment-field select:disabled {
+  color: #667085;
+  background: #f5f5f5;
+}
+.experiment-field select:focus {
+  outline: 2px solid #91caff;
+}
+.experiment-toolbar {
+  margin: 14px 0;
+}
+.experiment-context {
+  padding: 10px 14px;
+  background: #edf4ff;
+  border-left: 3px solid #2563eb;
+  overflow-wrap: anywhere;
+}
+.experiment-upload {
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  max-width: 330px;
+}
+.experiment-warning {
+  padding: 12px;
+  background: #fff7e6;
+  margin: 14px 0;
+  border: 1px solid #ffe58f;
+}
+.preserve-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.experiment-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: #f4f6fa;
+  max-height: 450px;
+  overflow: auto;
+}
+.experiment-scan-state {
+  min-height: 108px;
+  padding: 24px;
+  border: 2px solid #91caff;
+  background: #e6f4ff;
+  border-radius: 8px;
+}
+.experiment-scan-state strong {
+  font-size: 28px;
+}
+.experiment-scan-state p {
+  margin: 8px 0 0;
+  font-size: 18px;
+}
+.experiment-scan-state.failed {
+  background: #fff1f0;
+  border-color: #ff4d4f;
+  color: #a8071a;
+}
+.experiment-scan-state.passed {
+  background: #f6ffed;
+  border-color: #52c41a;
+  color: #237804;
+}
+.experiment-label-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
+}
+.experiment-label-card {
+  padding: 14px;
+  border: 1px solid #e3e9f2;
+  border-radius: 6px;
+  background: #fafcff;
+  min-width: 0;
+}
+.experiment-tube-label {
+  width: 295px;
+  max-width: 100%;
+  margin: 12px 0;
+  background: #fff;
+  border: 1px solid #cfd8e6;
+}
+.experiment-label-artwork {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.experiment-label-card dl {
+  margin: 0;
+}
+.experiment-label-card dl div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 0;
+}
+.experiment-label-card dt {
+  color: #667085;
+  font-size: 12px;
+}
+.experiment-label-card dd {
+  margin: 0;
+  font-size: 13px;
+}
+.experiment-print-order {
+  max-height: 160px;
+  overflow: auto;
+  padding-left: 24px;
+  font-size: 13px;
+}
+.experiment-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.experiment-event-detail section {
+  margin: 16px 0;
+}
+.experiment-snapshot-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+#experiment-print-root {
+  display: none;
+}
+@media (max-width: 760px) {
+  .mobile-menu-toggle {
+    display: inline-flex;
+  }
+  .experiment-page-title {
+    flex-wrap: wrap;
+  }
+  .experiment-workspace {
+    padding: 12px;
+  }
+  .experiment-scan-state strong {
+    font-size: 22px;
+  }
+  .experiment-label-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .experiment-snapshot-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+@media print {
+  body > #experiment-print-root {
+    display: block !important;
+    width: 25mm;
+    margin: 0;
+    padding: 0;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  #experiment-print-root .experiment-print-page {
+    width: 25mm;
+    height: 10mm;
+    break-after: page;
+    page-break-after: always;
+    margin: 0;
+    padding: 0;
+  }
+  #experiment-print-root .experiment-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  #experiment-print-root .experiment-tube-label {
+    width: 25mm;
+    max-width: none;
+    height: 10mm;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  #experiment-print-root .experiment-label-artwork {
     width: 25mm;
     height: 10mm;
   }

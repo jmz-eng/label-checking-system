@@ -16,9 +16,9 @@ import {
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { Avatar, Button, Layout, Menu, Space, Typography } from 'antd';
+import { Avatar, Button, Drawer, Layout, Menu, Space, Typography } from 'antd';
 import type { MenuProps } from 'antd';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../stores/AuthContext';
 import type { AppMenu } from '../types';
@@ -51,15 +51,41 @@ function toMenuItems(menus: AppMenu[]): MenuProps['items'] {
   return menus.map((menu) => ({
     key: menu.menuKey,
     icon: menu.icon ? iconMap[menu.icon] : undefined,
-    label: menu.menuName,
+    label: [
+      'DashboardPage',
+      'ProjectsPage',
+      'SampleTasksPage',
+      'ScanWorkbenchPage',
+      'LabelPreviewPage',
+      'TracePage',
+      'ExceptionInterceptionPage',
+      'StatisticsReportPage',
+    ].includes(menu.component || '')
+      ? `${menu.menuName}（旧版）`
+      : menu.menuName,
     children: menu.children?.length ? toMenuItems(menu.children) : undefined,
   }));
 }
 
 export function AppShell() {
-  const { user, menus, logout } = useAuth();
+  const { user, menus: serverMenus, logout } = useAuth();
+  const hasExperiments = flattenMenus(serverMenus).some(
+    (menu) => menu.component === 'ExperimentsPage',
+  );
+  function adapt(menus: AppMenu[]): AppMenu[] {
+    return menus.map((menu) => ({
+      ...menu,
+      routePath:
+        hasExperiments && menu.component === 'DashboardPage' && menu.routePath === '/'
+          ? '/legacy-workbench'
+          : menu.routePath,
+      children: adapt(menu.children || []),
+    }));
+  }
+  const menus = adapt(serverMenus);
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileMenu, setMobileMenu] = useState(false);
 
   const flatMenus = flattenMenus(menus);
   const selected = flatMenus.find((item) => item.routePath === location.pathname);
@@ -71,6 +97,7 @@ export function AppShell() {
     const item = flatMenus.find((menu) => menu.menuKey === key);
     if (item?.routePath && item.component !== 'LAYOUT') {
       navigate(item.routePath);
+      setMobileMenu(false);
     }
   };
 
@@ -103,6 +130,12 @@ export function AppShell() {
       <Layout className="app-main-layout">
         <Header className="app-header">
           <div className="app-header-inner">
+            <Button
+              className="mobile-menu-toggle"
+              aria-label="打开导航"
+              icon={<MenuOutlined />}
+              onClick={() => setMobileMenu(true)}
+            />
             <div className="app-title-block">
               <Typography.Title level={4} className="page-title">
                 标签防错工作台
@@ -121,8 +154,42 @@ export function AppShell() {
             </Space>
           </div>
         </Header>
+        <Drawer
+          title="功能导航"
+          open={mobileMenu}
+          onClose={() => setMobileMenu(false)}
+          placement="left"
+          width={290}
+        >
+          <Menu
+            mode="inline"
+            selectedKeys={selected ? [selected.menuKey] : []}
+            items={toMenuItems(menus)}
+            onClick={handleMenuClick}
+          />
+        </Drawer>
         <Content className="app-content">
           <div className="app-content-inner">
+            {selected?.component &&
+              [
+                'DashboardPage',
+                'ProjectsPage',
+                'SampleTasksPage',
+                'ScanWorkbenchPage',
+                'LabelPreviewPage',
+                'TracePage',
+                'ExceptionInterceptionPage',
+                'StatisticsReportPage',
+              ].includes(selected.component) && (
+                <div className="legacy-workflow-note">
+                  旧版资料与历史记录
+                  {flatMenus.some((menu) => menu.component === 'ExperimentsPage') && (
+                    <Button type="link" onClick={() => navigate('/experiments')}>
+                      进入实验列表开展新核对
+                    </Button>
+                  )}
+                </div>
+              )}
             <Outlet />
           </div>
         </Content>
