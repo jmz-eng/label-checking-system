@@ -1,10 +1,10 @@
 import type { Tube } from '../../types/experiments';
-import { DOTS_PER_MODULE, LABEL_HEIGHT_DOTS, LABEL_WIDTH_DOTS } from '../../utils/labelLayout';
+import { LABEL_HEIGHT_DOTS, LABEL_WIDTH_DOTS } from '../../utils/labelLayout';
 import { createTubeLabelLayout } from '../../utils/tubeLabelLayout';
 export function TubeLabel({ tube }: { tube: Tube }) {
   const layout = createTubeLabelLayout(tube);
   return (
-    <div className="experiment-tube-label" data-tube-id={tube.id} data-code={tube.code}>
+    <div className="experiment-tube-label" data-tube-id={tube.id} data-code={tube.code} data-barcode={tube.barcode}>
       {layout.error ? (
         <div className="label-layout-error">{layout.error}</div>
       ) : (
@@ -17,10 +17,10 @@ export function TubeLabel({ tube }: { tube: Tube }) {
         >
           <rect x="0" y="0" width={LABEL_WIDTH_DOTS} height={LABEL_HEIGHT_DOTS} fill="#fff" />
           <g
-            transform={`translate(${layout.qrX},${layout.qrY}) scale(${DOTS_PER_MODULE})`}
+            transform={`translate(${layout.barcodeX},${layout.barcodeY})`}
             shapeRendering="crispEdges"
           >
-            <path d={layout.qrPath} fill="#000" />
+            <path data-barcode="true" d={layout.barcodePath} fill="#000" />
           </g>
           {layout.lines.map((line, i) => (
             <text

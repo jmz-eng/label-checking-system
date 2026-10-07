@@ -1,16 +1,17 @@
-import { Ecc, QrCode, QrSegment } from '@rc-component/qrcode/lib/libs/qrcodegen.js';
+import JsBarcode from 'jsbarcode';
 import type { SampleTask } from '../types';
 
 export const LABEL_WIDTH_MM = 25;
 export const LABEL_HEIGHT_MM = 10;
 export const LABEL_DPI = 300;
-export const DOTS_PER_MODULE = 3;
-export const QUIET_MODULES = 4;
+export const DOTS_PER_MODULE = 2;
+export const QUIET_MODULES = 10;
 const DOTS_PER_MM = LABEL_DPI / 25.4;
 export const LABEL_WIDTH_DOTS = LABEL_WIDTH_MM * DOTS_PER_MM;
 export const LABEL_HEIGHT_DOTS = LABEL_HEIGHT_MM * DOTS_PER_MM;
+export const MIN_FONT_DOTS = 16;
 const EDGE_DOTS = 3;
-const MIN_FONT_DOTS = 16;
+const BAR_HEIGHT_DOTS = 32;
 
 export interface LabelLine {
   text: string;
@@ -19,41 +20,62 @@ export interface LabelLine {
   width: number;
   bold: boolean;
 }
-
 export interface LabelLayout {
   error?: string;
-  qrPath: string;
-  qrSize: number;
-  qrX: number;
-  qrY: number;
+  barcodePath: string;
+  barcodeWidth: number;
+  barcodeX: number;
+  barcodeY: number;
   textX: number;
   lines: LabelLine[];
 }
 
-export function createLabelLayout(task: SampleTask): LabelLayout {
-  const result: LabelLayout = { qrPath: '', qrSize: 0, qrX: EDGE_DOTS, qrY: 0, textX: 0, lines: [] };
-  if (!task.labelCode.trim()) return { ...result, error: '标签码为空，无法打印。' };
-  try {
-    // 版本 3 加四格留白后占 111 个打印点，再增大就无法放入 10 mm 高的纸张。
-    const qr = QrCode.encodeSegments(QrSegment.makeSegments(task.labelCode), Ecc.MEDIUM, 1, 3, -1, false);
-    result.qrSize = (qr.size + QUIET_MODULES * 2) * DOTS_PER_MODULE;
-    result.qrY = Math.floor((LABEL_HEIGHT_DOTS - result.qrSize) / 2);
-    result.textX = EDGE_DOTS + result.qrSize + EDGE_DOTS;
-    result.qrPath = qr.getModules().flatMap((row, y) => row.flatMap((dark, x) => dark
-      ? [`M${x + QUIET_MODULES},${y + QUIET_MODULES}h1v1h-1z`] : [])).join('');
-  } catch {
-    return { ...result, error: '标签码过长，25 × 10 mm 无法保留足够清晰的二维码，请使用更大标签。' };
+/** Shared physical layout. The original label identity is never used as a fallback alias. */
+interface LabelFields {
+  projectCode: string;
+  animalNo: string;
+  timePoint: string;
+  labelInfo: string;
+  collectDate: string;
+}
+export function createBarcodeLabelLayout(barcode: string | undefined, source: LabelFields): LabelLayout {
+  const result: LabelLayout = {
+    barcodePath: '', barcodeWidth: 0, barcodeX: 0, barcodeY: EDGE_DOTS,
+    textX: EDGE_DOTS, lines: [],
+  };
+  if (!barcode || !/^[0-9]{12}$/.test(barcode)) {
+    return { ...result, error: '缺少有效的12位条形码，不能打印。历史快照未保存条形码时，请从当前管子重新登记打印请求。' };
   }
-  const maxWidth = LABEL_WIDTH_DOTS - result.textX - EDGE_DOTS;
-  const fields = [task.projectCode, task.animalNo, `${task.timePoint} ${task.sampleType}`, task.plannedCollectDate];
+  const originalFields = [source.projectCode, source.animalNo, source.timePoint, source.labelInfo, source.collectDate];
+  if (originalFields.some((text) => typeof text !== 'string' || !text.trim()))
+    return { ...result, error: '标签文字缺失，不能打印不完整的标签。' };
+  if (originalFields.some((text) => /[\r\n\t]/.test(text)))
+    return { ...result, error: '标签文字包含换行或制表符，25 × 10 mm无法完整保留，请调整内容或使用更大标签。' };
+  const fields = [source.projectCode, `${source.animalNo} ${source.timePoint}`, source.labelInfo, source.collectDate];
+  const encoded: { encodings?: { data: string }[] } = {};
+  JsBarcode(encoded, barcode, { format: 'CODE128C', displayValue: false, margin: 0 });
+  const modules = encoded.encodings!.map((part) => part.data).join('');
+  const quietDots = QUIET_MODULES * DOTS_PER_MODULE;
+  result.barcodeWidth = modules.length * DOTS_PER_MODULE + quietDots * 2;
+  if (result.barcodeWidth > LABEL_WIDTH_DOTS - EDGE_DOTS * 2)
+    return { ...result, error: '条形码超出25 × 10 mm标签，不能缩小码元打印。' };
+  result.barcodeX = Math.floor((LABEL_WIDTH_DOTS - result.barcodeWidth) / 2);
+  result.barcodePath = Array.from(modules).flatMap((value, x) => value === '1'
+    ? [`M${quietDots + x * DOTS_PER_MODULE},0h${DOTS_PER_MODULE}v${BAR_HEIGHT_DOTS}h-${DOTS_PER_MODULE}z`] : []).join('');
+  const maxWidth = LABEL_WIDTH_DOTS - EDGE_DOTS * 2;
   result.lines = fields.map((text, index) => {
-    // 保守估计中英文宽度，并使用 SVG 固定行宽，完整保留文字，不截断动物号或时间点。
     const units = Array.from(text).reduce((sum, char) => sum + (/[^\x00-\x7f]/.test(char) ? 1 : 0.7), 0);
-    const fontSize = Math.min(index === 1 ? 23 : 18, maxWidth / Math.max(units, 1));
-    return { text, y: 24 + index * 26, fontSize, width: units * fontSize, bold: index === 1 };
+    const fontSize = Math.min(18, maxWidth / Math.max(units, 1));
+    return { text, y: 57 + index * 18, fontSize, width: units * fontSize, bold: index === 1 };
   });
-  if (result.lines.some((line) => line.fontSize < MIN_FONT_DOTS)) {
-    result.error = '标签文字过长，25 × 10 mm 无法清晰显示完整信息，请使用更大标签。';
-  }
+  if (result.lines.some((line) => line.fontSize < MIN_FONT_DOTS))
+    result.error = '标签文字缺失或过长，25 × 10 mm 无法完整清晰显示，不能缩小到16打印点以下，请调整内容或使用更大标签。';
   return result;
+}
+
+export function createLabelLayout(task: SampleTask): LabelLayout {
+  return createBarcodeLabelLayout(task.barcode, {
+    projectCode: task.projectCode, animalNo: task.animalNo, timePoint: task.timePoint,
+    labelInfo: task.sampleType, collectDate: task.plannedCollectDate,
+  });
 }

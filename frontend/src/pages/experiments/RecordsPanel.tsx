@@ -159,7 +159,7 @@ export function RecordsPanel({
           />
         </label>
         <label className="experiment-field">
-          <span>归档关键字 / 二维码</span>
+          <span>归档关键字 / 标签码</span>
           <Input
             aria-label="筛选归档关键字"
             value={filters.keyword || ''}

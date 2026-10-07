@@ -27,5 +27,6 @@ public class SampleTaskResponse {
     private LocalDate plannedCollectDate;
     private String status;
     private LocalDateTime createdAt;
+    private String barcode;
 }
 

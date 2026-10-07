@@ -239,6 +239,7 @@ public class ExperimentDataService {
                         "sourceTubeId",
                         "expiresAt")) if (b.containsKey(k)) row.put(k, b.get(k));
         row.remove("id");
+        row.remove("barcode");
         row.remove("createdAt");
         row.put("projectId", p);
         row.put("projectCode", str(r.project(p), "projectCode"));

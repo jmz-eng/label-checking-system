@@ -39,6 +39,7 @@ export interface SampleTask {
   groupNo?: string;
   gender?: string;
   labelCode: string;
+  barcode?: string;
   tubeNo?: string;
   sampleType: string;
   timePoint: string;

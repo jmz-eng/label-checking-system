@@ -39,6 +39,7 @@ export interface Tube {
   confirmed: boolean;
   sourceTubeId: string;
   code: string;
+  barcode?: string;
   status: 'ACTIVE' | 'VOID';
   printed: boolean;
   version: number;

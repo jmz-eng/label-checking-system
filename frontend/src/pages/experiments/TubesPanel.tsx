@@ -57,13 +57,13 @@ export function TubesPanel({
       setSelected([]);
       if ('tubes' in result)
         setSaved(
-          `批量更正已保存：${result.tubes.map((t) => `${t.id} · ${t.code}`).join('；')}。旧码已作废，请打印替换标签。`,
+          `批量更正已保存：${result.tubes.map((t) => `${t.id} · 条形码 ${t.barcode ?? "未登记"}`).join('；')}。旧码已作废，请打印替换标签。`,
         );
       else
         setSaved(
           path.endsWith('/void')
             ? `管子 ${result.id} 已作废，旧码不能继续使用。`
-            : `已保存新管子身份 ${result.id} · ${result.code}${result.replacesId ? '；旧二维码已作废，请打印新标签并替换。' : ''}`,
+            : `已保存新管子身份 ${result.id} · 条形码 ${result.barcode ?? "未登记"}${result.replacesId ? '；旧标签码已作废，请打印新标签并替换。' : ''}`,
         );
       await refresh();
     },
@@ -75,7 +75,7 @@ export function TubesPanel({
     (t) =>
       t.kind === kind &&
       (!status || t.status === status) &&
-      `${t.projectCode} ${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.code} ${t.id}`.includes(
+      `${t.projectCode} ${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.barcode ?? ""} ${t.code} ${t.id}`.includes(
         search,
       ),
   );
@@ -167,12 +167,12 @@ export function TubesPanel({
       </SectionTitle>
       <Alert
         type="info"
-        message="每支管有独立二维码。内容更正或替换会生成新身份并作废旧码；补打同一支管请在标签打印页选择原管，保持原二维码。采样日期始终是原始采血日期。"
+        message="每支管有独立标签码。内容更正或替换会生成新身份并作废旧码；补打同一支管请在标签打印页选择原管，保持原标签码。采样日期始终是原始采血日期。"
       />
       <Space wrap>
         <Input.Search
           aria-label="查找管子"
-          placeholder="动物、时间点、原始管标、日期或二维码"
+          placeholder="动物、时间点、原始管标、日期或标签码"
           onSearch={setSearch}
           allowClear
           style={{ width: 340 }}
@@ -366,7 +366,7 @@ export function TubesPanel({
           editing === 'new'
             ? `新增${name}`
             : mode === 'reissue'
-              ? '替换新管（新二维码）'
+              ? '替换新管（新标签码）'
               : '更正管子内容'
         }
         open={!!editing}
@@ -387,7 +387,7 @@ export function TubesPanel({
         {editing !== 'new' && (
           <Alert
             type="warning"
-            message="旧二维码将作废。原内容与核对历史保留；保存后打印新管标签并替换，不能沿用旧标签。"
+            message="旧标签码将作废。原内容与核对历史保留；保存后打印新管标签并替换，不能沿用旧标签。"
           />
         )}
         <Form
@@ -485,7 +485,7 @@ export function TubesPanel({
           </Button>
         }
       >
-        <Alert type="warning" message="作废后旧二维码不能再打印或核对，历史记录仍保留。" />
+        <Alert type="warning" message="作废后旧标签码不能再打印或核对，历史记录仍保留。" />
         <Input.TextArea
           aria-label="作废原因"
           value={reason}

@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 import type { SampleTask, ScanRecord } from '../../src/types';
 
 const tasks: SampleTask[] = Array.from({ length: 12 }, (_, index) => ({
-  id: index + 1, projectId: 1, projectCode: 'PROJECT-A', projectName: '测试项目', testArticle: '测试供试品',
+  barcode: String(index + 201).padStart(12, '0'), id: index + 1, projectId: 1, projectCode: 'PROJECT-A', projectName: '测试项目', testArticle: '测试供试品',
   animalNo: `ANIMAL-${index + 1}`, labelCode: `LABEL-${index + 1}`, sampleType: index === 1 ? '血清' : 'PK',
   timePoint: 'D1', plannedCollectDate: index === 1 ? '2026-09-18' : '2026-09-17',
   status: index === 0 ? 'BOUND' : index === 1 ? 'RECORDED' : 'PRINTED', createdAt: '2026-09-17T09:00:00',
@@ -85,7 +85,7 @@ test('标签大图显示所选标签，并支持关闭', async ({ page }) => {
   await page.getByRole('button', { name: '查看大图' }).click();
   const modal = page.getByRole('dialog', { name: '标签大图' });
   await expect(modal).toBeVisible();
-  await expect(modal.getByText('ANIMAL-1', { exact: true })).toBeVisible();
+  await expect(modal.getByText('ANIMAL-1 D1', { exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/工作台标签大图.png', animations: 'disabled' });
   await modal.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(modal).not.toBeVisible();

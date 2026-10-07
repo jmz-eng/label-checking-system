@@ -18,12 +18,21 @@ public class TraceService {
 
     private final ScanRecordMapper scanRecordMapper;
     private final SysUserMapper userMapper;
+    private final com.tagmanagement.barcode.BarcodeRegistry barcodes;
+    private final com.tagmanagement.mapper.SampleTaskMapper tasks;
 
     public List<ScanRecordResponse> listScanRecords(String labelCode) {
         LambdaQueryWrapper<ScanRecord> wrapper = new LambdaQueryWrapper<ScanRecord>()
                 .orderByDesc(ScanRecord::getCreatedAt);
         if (StringUtils.hasText(labelCode)) {
-            wrapper.like(ScanRecord::getLabelCode, labelCode.trim());
+            String scanned = labelCode.trim();
+            String entity = barcodes.resolve("SAMPLE_TASK", scanned);
+            if (entity == null) wrapper.like(ScanRecord::getLabelCode, scanned);
+            else {
+                var task = tasks.selectById(Long.parseLong(entity));
+                if (task == null) wrapper.eq(ScanRecord::getTaskId, Long.parseLong(entity));
+                else wrapper.eq(ScanRecord::getLabelCode, task.getLabelCode());
+            }
         }
         return scanRecordMapper.selectList(wrapper).stream()
                 .map(this::toResponse)

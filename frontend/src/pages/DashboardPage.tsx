@@ -123,7 +123,7 @@ export function DashboardPage() {
     return tasks.filter((task) => (!status || task.status === status)
       && (!sampleType || task.sampleType === sampleType)
       && (!collectDate || task.plannedCollectDate === collectDate)
-      && (!query || [task.labelCode, task.animalNo, task.projectCode, task.timePoint, taskNo(task)]
+      && (!query || [task.labelCode, task.barcode || "", task.animalNo, task.projectCode, task.timePoint, taskNo(task)]
         .some((value) => value.toLowerCase().includes(query))));
   }, [tasks, status, sampleType, collectDate, keyword]);
   const latestRecords = records.slice(0, 4);
@@ -234,7 +234,7 @@ export function DashboardPage() {
     { title: '记录时间', dataIndex: 'createdAt', width: 170, render: formatDateTime },
     { title: '操作类型', dataIndex: 'actionType', width: 110, render: (value: string) => scanActionText[value] ?? value },
     { title: '任务号', width: 150, render: (_, record) => record.labelCode.slice(-18) },
-    { title: '样本条码', dataIndex: 'labelCode', ellipsis: true },
+    { title: '原标签码', dataIndex: 'labelCode', ellipsis: true },
     { title: '操作者', dataIndex: 'operatorName', width: 90 },
     {
       title: '结果',

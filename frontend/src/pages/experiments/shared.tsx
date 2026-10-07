@@ -68,7 +68,8 @@ export function TubeFields({ tube }: { tube?: Tube }) {
           children: <span className="preserve-text">{tube.labelInfo}</span>,
           span: 2,
         },
-        { key: 'code', label: '二维码', children: tube.code },
+        { key: 'barcode', label: '条形码', children: tube.barcode || '历史快照未保存' },
+        { key: 'code', label: '原标签码', children: tube.code },
         {
           key: 'id',
           label: '管子身份 / 版本',

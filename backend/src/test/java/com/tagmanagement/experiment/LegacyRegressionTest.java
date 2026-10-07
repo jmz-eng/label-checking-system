@@ -112,4 +112,32 @@ class LegacyRegressionTest extends ExperimentTestSupport {
                         Integer.class,
                         code));
     }
+
+    @Test
+    void barcodeLegacyBindVerifyRecordAndVoid() throws Exception {
+        String code = fixture("PRINTED");
+        var response = mvc.perform(get("/api/sample-tasks").param("keyword", code).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String barcode = json.readTree(response).path("data").get(0).path("barcode").asText();
+        assertTrue(barcode.matches("[0-9]{12}"));
+        mvc.perform(post("/api/scan/bind").header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsBytes(Map.of("labelCode", barcode, "animalNo", "001")))).andExpect(status().isOk());
+        mvc.perform(post("/api/scan/verify").header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsBytes(Map.of("labelCode", code, "projectCode", code, "animalNo", "001", "timePoint", "1h")))).andExpect(status().isOk());
+        mvc.perform(post("/api/scan/record").header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsBytes(Map.of("labelCode", barcode)))).andExpect(status().isOk());
+        assertEquals("RECORDED", jdbc.queryForObject("SELECT status FROM sample_task WHERE label_code=?", String.class, code));
+        var searched = mvc.perform(get("/api/sample-tasks").param("keyword", barcode).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(code, json.readTree(searched).path("data").get(0).path("labelCode").asText());
+        var trace = mvc.perform(get("/api/scan-records").param("labelCode", barcode).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(3, json.readTree(trace).path("data").size());
+        assertTrue(json.readTree(trace).path("data").findValuesAsText("scannedPayload").stream()
+                .anyMatch(payload -> payload.contains(barcode)));
+        jdbc.update("UPDATE sample_task SET status='VOIDED' WHERE label_code=?", code);
+        for (String identity : List.of(code, barcode))
+            mvc.perform(post("/api/scan/record").header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsBytes(Map.of("labelCode", identity)))).andExpect(status().isConflict());
+    }
 }

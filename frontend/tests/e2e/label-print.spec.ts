@@ -5,10 +5,10 @@ import { createLabelLayout, DOTS_PER_MODULE, QUIET_MODULES } from '../../src/uti
 
 const task: SampleTask = {
   id: 1, projectId: 1, projectCode: 'SN26007PK02', projectName: '打印回归测试', testArticle: '测试',
-  labelCode: 'TM-SN26007PK02-31211PK-D196H-0002', animalNo: '312-11-PK', sampleType: '血常规',
+  barcode: '000000000001', labelCode: 'TM-SN26007PK02-31211PK-D196H-0002', animalNo: '312-11-PK', sampleType: '血常规',
   timePoint: 'D1-96h', plannedCollectDate: '2026-06-09', status: 'BOUND', createdAt: '2026-06-09T09:00:00',
 };
-const second: SampleTask = { ...task, id: 2, animalNo: '312-12-PK', labelCode: 'TM-SN26007PK02-31212PK-D196H-0003' };
+const second: SampleTask = { ...task, id: 2, barcode: '000000000002', animalNo: '312-12-PK', labelCode: 'TM-SN26007PK02-31212PK-D196H-0003' };
 
 async function openLabels(page: Page, data = [task, second]): Promise<void> {
   await page.route(/^http:\/\/127\.0\.0\.1:5175\/api\//, async (route) => {
@@ -25,14 +25,20 @@ async function openLabels(page: Page, data = [task, second]): Promise<void> {
   await expect(page.locator('.ant-spin-spinning')).toHaveCount(0);
 }
 
-test('标准标签按三点码元排版，保留四格留白，长码及长文字禁止缩小打印', () => {
+test('CODE128 C 保持两点模块、十模块静区，缺失别名与过长文字禁止打印', () => {
   const layout = createLabelLayout(task);
   expect(layout.error).toBeUndefined();
-  expect(layout.qrSize).toBe(99);
-  expect(DOTS_PER_MODULE).toBe(3);
-  expect(QUIET_MODULES).toBe(4);
-  expect(createLabelLayout({ ...task, labelCode: 'X'.repeat(200) }).error).toContain('标签码过长');
-  expect(createLabelLayout({ ...task, animalNo: 'ANIMAL'.repeat(20) }).error).toContain('标签文字过长');
+  expect(DOTS_PER_MODULE).toBe(2);
+  expect(QUIET_MODULES).toBe(10);
+  expect(createLabelLayout({ ...task, barcode: undefined }).error).toContain('条形码');
+  expect(createLabelLayout({ ...task, barcode: '123' }).error).toContain('条形码');
+  expect(createLabelLayout({ ...task, animalNo: '' }).error).toContain('缺失');
+  expect(createLabelLayout({ ...task, timePoint: '' }).error).toContain('缺失');
+  expect(createLabelLayout({ ...task, sampleType: '全血\n血常规' }).error).toContain('换行');
+  expect(layout.barcodeWidth).toBe(242);
+  expect(layout.lines.every((line) => line.fontSize >= 16 && line.y < 118)).toBe(true);
+  expect(layout.lines.map((line) => line.text)).toEqual([task.projectCode, `${task.animalNo} ${task.timePoint}`, task.sampleType, task.plannedCollectDate]);
+  expect(createLabelLayout({ ...task, animalNo: 'ANIMAL'.repeat(20) }).error).toContain('过长');
 });
 
 test.describe('300 dpi 打印输出', () => {
@@ -66,9 +72,9 @@ test('搜索后同步当前标签，空结果不可打印旧标签', async ({ pa
 });
 
 test('查询失败和超长标签均不可打印', async ({ page }) => {
-  await openLabels(page, [{ ...task, labelCode: 'X'.repeat(200) }]);
+  await openLabels(page, [{ ...task, barcode: undefined }]);
   await expect(page.getByRole('button', { name: '打印当前标签' })).toBeDisabled();
-  await expect(page.locator('.sticky-preview')).toContainText('标签码过长');
+  await expect(page.locator('.sticky-preview')).toContainText('条形码');
   await page.route(/^http:\/\/127\.0\.0\.1:5175\/api\/sample-tasks/, (route) => route.fulfill({ status: 500, json: { code: 500, message: '测试加载失败' } }));
   await page.getByPlaceholder('标签码、动物号、项目号').press('Enter');
   await expect(page.locator('.sticky-preview')).toContainText('请选择标签');

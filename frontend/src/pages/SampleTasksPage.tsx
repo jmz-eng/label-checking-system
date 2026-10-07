@@ -111,7 +111,8 @@ export function SampleTasksPage() {
   };
 
   const columns: ColumnsType<SampleTask> = [
-    { title: '标签码', dataIndex: 'labelCode', ellipsis: true },
+    { title: '条形码', dataIndex: 'barcode', ellipsis: true },
+    { title: '原标签码', dataIndex: 'labelCode', ellipsis: true },
     { title: '项目号', dataIndex: 'projectCode', width: 140 },
     { title: '动物号', dataIndex: 'animalNo', width: 120 },
     { title: '时间点', dataIndex: 'timePoint', width: 110 },

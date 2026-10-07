@@ -47,7 +47,8 @@ export function LabelPreviewPage() {
   const labelGrid = useMemo(() => tasks.slice(0, 6), [tasks]);
 
   const columns: ColumnsType<SampleTask> = [
-    { title: '标签码', dataIndex: 'labelCode', ellipsis: true },
+    { title: '条形码', dataIndex: 'barcode', ellipsis: true },
+    { title: '原标签码', dataIndex: 'labelCode', ellipsis: true },
     { title: '项目号', dataIndex: 'projectCode', width: 140 },
     { title: '动物号', dataIndex: 'animalNo', width: 120 },
     { title: '样本类型', dataIndex: 'sampleType', width: 120, render: (value: string) => <SampleTypeMark sampleType={value} /> },
@@ -64,7 +65,7 @@ export function LabelPreviewPage() {
           <div className="panel-title-row">
             <div>
               <Typography.Title level={4}>标签预览</Typography.Title>
-              <Typography.Text type="secondary">25 × 10 mm · 300 dpi · 二维码与完整标签码一致</Typography.Text>
+              <Typography.Text type="secondary">25 × 10 mm · 300 dpi · CODE128 C · 持久化12位条形码</Typography.Text>
             </div>
             <Space>
               <Input.Search

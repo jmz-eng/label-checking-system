@@ -27,7 +27,8 @@ export function TaskDetails({ task, records, canViewRecords, recordsError, onClo
       {task ? (
         <>
           <Descriptions bordered column={1} size="small" items={[
-            { key: 'label', label: '标签码', children: task.labelCode },
+            { key: 'barcode', label: '条形码', children: task.barcode || '未登记' },
+            { key: 'label', label: '原标签码', children: task.labelCode },
             { key: 'project', label: '项目', children: `${task.projectCode} / ${task.projectName}` },
             { key: 'animal', label: '动物号', children: task.animalNo },
             { key: 'sample', label: '样本类型', children: task.sampleType },

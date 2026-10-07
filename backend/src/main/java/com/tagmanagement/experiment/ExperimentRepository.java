@@ -20,6 +20,7 @@ import java.util.function.Supplier;
 /** SQL ownership, row locks, immutable archives and actor-scoped request deduplication. */
 @Repository
 public class ExperimentRepository {
+    final com.tagmanagement.barcode.BarcodeRegistry barcodes;
     final JdbcTemplate jdbc;
     final ObjectMapper json;
     final TransactionTemplate tx;
@@ -27,7 +28,9 @@ public class ExperimentRepository {
             Set.of("mapping", "purpose", "tube", "session", "event", "import", "print");
 
     public ExperimentRepository(
-            JdbcTemplate jdbc, ObjectMapper json, PlatformTransactionManager tm) {
+            JdbcTemplate jdbc, ObjectMapper json, PlatformTransactionManager tm,
+            com.tagmanagement.barcode.BarcodeRegistry barcodes) {
+        this.barcodes = barcodes;
         this.jdbc = jdbc;
         this.json = json;
         tx = new TransactionTemplate(tm);
@@ -113,7 +116,7 @@ public class ExperimentRepository {
                         (r, n) -> decode(r.getString(1)),
                         id);
         if (rows.isEmpty()) throw BusinessException.notFound(type + " 不存在");
-        return rows.get(0);
+        return live(type, rows.get(0));
     }
 
     public Map<String, Object> lock(String type, String id) {
@@ -123,7 +126,7 @@ public class ExperimentRepository {
                         (r, n) -> decode(r.getString(1)),
                         id);
         if (rows.isEmpty()) throw BusinessException.notFound(type + " 不存在");
-        return rows.get(0);
+        return live(type, rows.get(0));
     }
 
     public Map<String, Object> scopedLock(String type, long p, String id) {
@@ -158,8 +161,19 @@ public class ExperimentRepository {
     public List<Map<String, Object>> list(String type, long project) {
         return jdbc.query(
                 "SELECT payload FROM " + table(type) + " WHERE project_id=? ORDER BY created_at,id",
-                (r, n) -> decode(r.getString(1)),
+                (r, n) -> live(type, decode(r.getString(1))),
                 project);
+    }
+
+    private Map<String, Object> live(String type, Map<String, Object> row) {
+        if (type.equals("tube")) row.put("barcode", barcodes.existing("TUBE", str(row, "id")));
+        return row;
+    }
+
+    public List<Map<String, Object>> tubesForScan(String content) {
+        String entity = barcodes.resolve("TUBE", content);
+        return jdbc.query("SELECT payload FROM exp_tube WHERE " + (entity == null ? "code=?" : "id=?"),
+                (r, n) -> decode(r.getString(1)), entity == null ? content : entity);
     }
 
     public void save(String type, Map<String, Object> row) {
@@ -176,6 +190,7 @@ public class ExperimentRepository {
             if (type.equals("event")) throw new IllegalStateException("Archives are append-only");
             jdbc.update("UPDATE " + table(type) + " SET payload=? WHERE id=?", encode(row), id);
         }
+        if (type.equals("tube")) row.put("barcode", barcodes.allocate("TUBE", str(row, "id")));
         if (type.equals("tube"))
             jdbc.update("UPDATE exp_tube SET code=? WHERE id=?", row.get("code"), row.get("id"));
         if (type.equals("session"))

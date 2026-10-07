@@ -39,6 +39,7 @@ public class SampleTaskService {
     private final ScanRecordMapper scanRecordMapper;
     private final AuditLogService auditLogService;
     private final ProjectService projectService;
+    private final com.tagmanagement.barcode.BarcodeRegistry barcodes;
 
     public List<SampleTaskResponse> list(Long projectId, String status, String keyword) {
         LambdaQueryWrapper<SampleTask> wrapper = new LambdaQueryWrapper<SampleTask>()
@@ -58,6 +59,7 @@ public class SampleTaskService {
         String lowerKeyword = keyword.trim().toLowerCase(Locale.ROOT);
         return responses.stream()
                 .filter(item -> contains(item.getLabelCode(), lowerKeyword)
+                        || contains(item.getBarcode(), lowerKeyword)
                         || contains(item.getAnimalNo(), lowerKeyword)
                         || contains(item.getProjectCode(), lowerKeyword)
                         || contains(item.getTimePoint(), lowerKeyword))
@@ -94,7 +96,7 @@ public class SampleTaskService {
         }
         AnimalInfo animal = animalMapper.selectById(task.getAnimalId());
         String expected = expectedSummary(task);
-        String payload = "animalNo=" + request.getAnimalNo();
+        String payload = "labelCode=" + request.getLabelCode() + ", animalNo=" + request.getAnimalNo();
 
         if (!same(animal.getAnimalNo(), request.getAnimalNo())) {
             String message = "动物号不一致，期望 " + animal.getAnimalNo() + "，实际 " + request.getAnimalNo();
@@ -128,7 +130,7 @@ public class SampleTaskService {
         ProjectInfo project = projectMapper.selectById(task.getProjectId());
         AnimalInfo animal = animalMapper.selectById(task.getAnimalId());
         String expected = expectedSummary(task);
-        String payload = "projectCode=" + request.getProjectCode()
+        String payload = "labelCode=" + request.getLabelCode() + ", projectCode=" + request.getProjectCode()
                 + ", animalNo=" + request.getAnimalNo()
                 + ", timePoint=" + request.getTimePoint();
 
@@ -189,7 +191,7 @@ public class SampleTaskService {
         sampleTaskMapper.updateById(task);
 
         String message = "录入确认完成";
-        String payload = "resultNote=" + (StringUtils.hasText(request.getResultNote()) ? request.getResultNote() : "");
+        String payload = "labelCode=" + request.getLabelCode() + ", resultNote=" + (StringUtils.hasText(request.getResultNote()) ? request.getResultNote() : "");
         recordScan(task, BusinessConstants.SCAN_RECORD, expectedSummary(task), payload, BusinessConstants.RESULT_PASS, message);
         auditLogService.record("扫码", "录入确认", task.getLabelCode(), message);
         return new ScanResultResponse(true, message, task.getStatus(), toResponse(task));
@@ -213,7 +215,8 @@ public class SampleTaskService {
                 task.getTimePoint(),
                 task.getPlannedCollectDate(),
                 task.getStatus(),
-                task.getCreatedAt()
+                task.getCreatedAt(),
+                barcodes.allocate("SAMPLE_TASK", task.getId().toString())
         );
     }
 
@@ -251,8 +254,11 @@ public class SampleTaskService {
 
     private SampleTask findTaskForScan(String labelCode, String actionType) {
         String code = labelCode.trim();
-        SampleTask task = sampleTaskMapper.selectOne(new LambdaQueryWrapper<SampleTask>()
-                .eq(SampleTask::getLabelCode, code).last("FOR UPDATE"));
+        String entity = barcodes.resolve("SAMPLE_TASK", code);
+        LambdaQueryWrapper<SampleTask> lookup = new LambdaQueryWrapper<SampleTask>();
+        if (entity == null) lookup.eq(SampleTask::getLabelCode, code);
+        else lookup.eq(SampleTask::getId, Long.parseLong(entity));
+        SampleTask task = sampleTaskMapper.selectOne(lookup.last("FOR UPDATE"));
         if (task == null) {
             ScanRecord record = new ScanRecord();
             record.setLabelCode(code);

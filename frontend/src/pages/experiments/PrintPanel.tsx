@@ -76,7 +76,7 @@ export function PrintPanel({
     );
     const invalid = response.tubes.filter((t) => createTubeLabelLayout(t).error);
     if (invalid.length) {
-      setError('服务器返回的标签包含过长内容，请重新预览。已登记请求，但未打开打印。');
+      setError(`${createTubeLabelLayout(invalid[0]).error} 已登记请求，但未打开打印。`);
       return;
     }
     const ids = requestedIds?.length ? requestedIds : response.tubes.map((tube) => tube.id);
@@ -151,7 +151,7 @@ export function PrintPanel({
   const rows = tubes.filter(
     (t) =>
       (!kind || t.kind === kind) &&
-      `${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.code}`.includes(search),
+      `${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.barcode ?? ""} ${t.code}`.includes(search),
   );
   function select(ids: string[]) {
     setSelected(ids);
@@ -165,7 +165,7 @@ export function PrintPanel({
       <SectionTitle title="完整标签预览与批量打印" />
       <Alert
         type="info"
-        message="25 × 10 mm；左侧黑白二维码，右侧完整五项原始字段。300 dpi 使用整数码元和四格白色留边。最小字号 16 打印点（约3.84磅），需用实际纸张、打印机和扫码设备确认可读性。过长标签逐支提示，不能裁切或无限缩小。"
+        message="25 × 10 mm；上方黑白条形码，下方完整五项原始字段（动物号与时间点合为一行）。300 dpi 使用两点码元和两侧各十模块白色留边。最小字号 16 打印点（约3.84磅），需用实际纸张、打印机和扫码设备确认可读性。过长标签逐支提示，不能裁切或无限缩小。"
       />
       {!allowed && <Alert type="warning" message="当前账号没有标签打印权限" />}
       <Space wrap>
@@ -237,7 +237,7 @@ export function PrintPanel({
           {
             title: '打印 / 可用状态',
             render: (_, t) =>
-              ineligible(t) || (t.printed ? '同一支管补打，二维码不变' : '首次打印请求'),
+              ineligible(t) || (t.printed ? '同一支管补打，条形码不变' : '首次打印请求'),
           },
         ]}
       />

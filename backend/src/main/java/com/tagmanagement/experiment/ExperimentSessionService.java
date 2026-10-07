@@ -147,12 +147,7 @@ public class ExperimentSessionService {
                     if (chip) return chip(s, raw, content, p);
                     if ("CHIP".equals(s.get("pending")))
                         return finish(s, raw, null, "FAIL", "请先扫描动物芯片");
-                    var matches =
-                            r.jdbc()
-                                    .query(
-                                            "SELECT payload FROM exp_tube WHERE code=?",
-                                            (rs, n) -> r.decode(rs.getString(1)),
-                                            content);
+                    var matches = r.tubesForScan(content);
                     if (matches.isEmpty()) return finish(s, raw, null, "FAIL", "未知标签码");
                     var t = matches.get(0);
                     Map<String, Map<String, Object>> lockedTubes;

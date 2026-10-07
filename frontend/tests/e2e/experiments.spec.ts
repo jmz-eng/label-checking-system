@@ -30,6 +30,7 @@ const tube = {
   confirmed: true,
   sourceTubeId: '',
   code: 'Eabcdefghijklmnopqrstuv',
+  barcode: '000000000101',
   status: 'ACTIVE',
   printed: false,
   version: 1,
@@ -43,6 +44,7 @@ const aliquot = {
   labelInfo: '血浆',
   sourceTubeId: 't1',
   code: 'EABCDEFGHIJKLMNOPQRSTUV',
+  barcode: '000000000102',
 };
 const session = {
   id: 's1',
@@ -479,13 +481,13 @@ test('用途归类与歧义配对批量确认，保存响应后刷新新管身�
     if (path.endsWith('/tube-assignments')) {
       assignment = body;
       return {
-        tubes: [{ ...aliquot, id: 'replacement', code: 'E1234567890123456789012' }],
+        tubes: [{ ...aliquot, id: 'replacement', barcode: '000000000103', code: 'E1234567890123456789012' }],
       };
     }
     if (path.endsWith('/tubes'))
       return [
         tube,
-        { ...tube, id: 't3', code: 'E1234567890123456789013' },
+        { ...tube, id: 't3', barcode: '000000000104', code: 'E1234567890123456789013' },
         {
           ...aliquot,
           confirmed: false,
@@ -511,13 +513,13 @@ test('管子内容更正需原因，说明旧码作废，新增与同管补打�
       return {
         ...tube,
         id: 'new-id',
-        code: 'E1234567890123456789012',
+        barcode: '000000000103', code: 'E1234567890123456789012',
         replacesId: 't1',
       };
     }
   });
   await page.getByRole('button', { name: '更正 t1' }).click();
-  await expect(page.getByRole('dialog')).toContainText('旧二维码将作废');
+  await expect(page.getByRole('dialog')).toContainText('旧标签码将作废');
   await page.getByRole('dialog').getByLabel('管标信息').fill('更正全血');
   await page.getByRole('dialog').getByRole('button', { name: '保存更正' }).click();
   await expect(page.getByText('请填写原因', { exact: true })).toBeVisible();
@@ -535,7 +537,7 @@ test('标签全部五字段完整预览，溢出逐管诊断禁止打印', async
           {
             ...tube,
             id: 'long',
-            code: 'E1234567890123456789012',
+            barcode: '000000000103', code: 'E1234567890123456789012',
             labelInfo: '完整保留的超长原始管标信息'.repeat(20),
           },
         ]
@@ -555,7 +557,7 @@ test('标签全部五字段完整预览，溢出逐管诊断禁止打印', async
   await expect(page.getByTestId('label-overflows')).toContainText('long');
   await expect(page.getByRole('button', { name: '登记打印请求并打开打印' })).toBeDisabled();
 });
-test('批量打印每支独立25x10mm页，只登记请求，补打保持二维码', async ({ page }) => {
+test('批量打印每支独立25x10mm页，只登记请求，补打保持条形码', async ({ page }) => {
   let printed: Body | undefined;
   await open(page, 'print', (path, body, method) => {
     if (path.endsWith('/print-requests') && method === 'POST') {
@@ -841,7 +843,7 @@ test('分组更正保留原因和历史，用途规则需要明确确认', async
 });
 test.describe('实验标签300dpi渲染', () => {
   test.use({ deviceScaleFactor: 300 / 96 });
-  test('完整标签黑白二维码与五字段导出300dpi图', async ({ page }, testInfo) => {
+  test('完整标签黑白条形码与五字段导出300dpi图', async ({ page }, testInfo) => {
     await open(page, 'print', (path, _body, method) =>
       path.endsWith('/print-requests') && method === 'POST'
         ? {
@@ -866,6 +868,8 @@ test.describe('实验标签300dpi渲染', () => {
       'data-code',
       tube.code,
     );
+    await expect(page.locator('#experiment-print-root .experiment-tube-label')).toHaveAttribute('data-barcode', tube.barcode);
+    await page.pdf({ path: testInfo.outputPath('label-25x10mm.pdf'), preferCSSPageSize: true, printBackground: true, displayHeaderFooter: false });
   });
 });
 
@@ -1320,7 +1324,7 @@ test('通过后重选条件隐藏旧绿色提示和实际管子', async ({ page 
 });
 
 test('管子批量选择明确覆盖全部筛选结果', async ({ page }) => {
-  const tubes = Array.from({ length: 21 }, (_, i) => ({ ...tube, id: `bulk-${i}` }));
+  const tubes = Array.from({ length: 21 }, (_, i) => ({ ...tube, id: `bulk-${i}`, barcode: String(i + 301).padStart(12, '0') }));
   await open(page, 'collection-tubes', (path) => (path.endsWith('/tubes') ? tubes : undefined));
   await page.getByRole('checkbox', { name: '选择筛选结果（最多1000支）', exact: true }).check();
   await expect(page.getByText('已选 21 支', { exact: false })).toBeVisible();
@@ -1474,4 +1478,24 @@ test('持久化写入不可用时仍能在当前面板确认原请求', async ({
   await page.getByLabel('扫描内容').press('Enter');
   await expect(page.getByTestId('scan-state')).toContainText('扫描采血管');
   await expect(page.getByLabel('扫描内容')).toHaveValue('');
+});
+
+test('条形码可筛选当前管子，历史无别名的打印快照禁止猜码', async ({ page }) => {
+  await open(page, 'print', (path, _body, method) =>
+    path.endsWith('/print-requests') && method === 'POST'
+      ? { id: 'oldprint', status: 'REQUEST_ACKNOWLEDGED', tubes: [{ ...tube, barcode: undefined }], createdAt: tube.createdAt }
+      : undefined,
+  );
+  const search = page.getByPlaceholder('动物、时间点、管标、日期或短码');
+  await search.fill(tube.barcode);
+  await search.press('Enter');
+  await expect(page.getByRole('checkbox', { name: '选择标签 t1' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: '选择标签 t2' })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: '选择标签 t1' }).check();
+  let prints = 0;
+  await page.exposeFunction('testPrint', () => { prints += 1; });
+  await page.evaluate(() => { window.print = () => { void (window as unknown as { testPrint(): void }).testPrint(); }; });
+  await page.getByRole('button', { name: '登记打印请求并打开打印' }).click();
+  await expect(page.getByText(/缺少有效的12位条形码/).last()).toBeVisible();
+  expect(prints).toBe(0);
 });
