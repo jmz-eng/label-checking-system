@@ -159,10 +159,14 @@ public class ExperimentRepository {
     }
 
     public List<Map<String, Object>> list(String type, long project) {
-        return jdbc.query(
+        var rows = jdbc.query(
                 "SELECT payload FROM " + table(type) + " WHERE project_id=? ORDER BY created_at,id",
-                (r, n) -> live(type, decode(r.getString(1))),
+                (r, n) -> decode(r.getString(1)),
                 project);
+        // Release the nontransactional query connection before alias lookups. A caller's
+        // transaction still retains its connection and row locks through the usual JDBC binding.
+        rows.forEach(row -> live(type, row));
+        return rows;
     }
 
     private Map<String, Object> live(String type, Map<String, Object> row) {
@@ -174,6 +178,14 @@ public class ExperimentRepository {
         String entity = barcodes.resolve("TUBE", content);
         return jdbc.query("SELECT payload FROM exp_tube WHERE " + (entity == null ? "code=?" : "id=?"),
                 (r, n) -> decode(r.getString(1)), entity == null ? content : entity);
+    }
+
+    public Map<String, Object> tubeForHistory(long project, String keyword) {
+        String entity = barcodes.resolve("TUBE", keyword);
+        if (entity == null) return null;
+        var rows = jdbc.query("SELECT payload FROM exp_tube WHERE id=? AND project_id=?",
+                (r, n) -> decode(r.getString(1)), entity, project);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     public void save(String type, Map<String, Object> row) {

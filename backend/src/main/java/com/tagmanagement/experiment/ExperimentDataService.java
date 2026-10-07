@@ -427,6 +427,8 @@ public class ExperimentDataService {
 
     public List<Map<String, Object>> filtered(String type, long p, Map<String, String> filters) {
         r.project(p);
+        Map<String, Object> historyTube = type.equals("event")
+                ? r.tubeForHistory(p, filters.get("keyword")) : null;
         return r.list(type, p).stream()
                 .filter(
                         row ->
@@ -442,10 +444,31 @@ public class ExperimentDataService {
                                                         candidate = expected.get(f.getKey());
                                                     return f.getKey().equals("keyword")
                                                             ? r.encode(row).contains(f.getValue())
+                                                                    || (historyTube != null
+                                                                            && referencesTube(row, historyTube))
                                                             : Objects.equals(
                                                                     String.valueOf(candidate),
                                                                     f.getValue());
                                                 }))
                 .toList();
+    }
+
+    // Match identity fields in immutable snapshots, including print tube lists and sessions.
+    // Substring matches on IDs/codes or mentions in free text do not establish a tube reference.
+    private boolean referencesTube(Object value, Map<String, Object> tube) {
+        if (value instanceof Map<?, ?> fields) {
+            for (var entry : fields.entrySet()) {
+                Object candidate = entry.getValue();
+                if (Set.of("id", "entityId", "targetTubeId", "sourceTubeId").contains(entry.getKey())
+                        && Objects.equals(candidate, tube.get("id"))) return true;
+                if (Set.of("code", "scannedContent").contains(entry.getKey())
+                        && !str(tube, "code").isEmpty()
+                        && Objects.equals(candidate, tube.get("code"))) return true;
+                if (referencesTube(candidate, tube)) return true;
+            }
+        } else if (value instanceof Collection<?> rows) {
+            for (Object row : rows) if (referencesTube(row, tube)) return true;
+        }
+        return false;
     }
 }
