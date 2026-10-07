@@ -8,7 +8,6 @@ import {
   Space,
   Spin,
   Table,
-  Tabs,
   Typography,
 } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -23,6 +22,8 @@ import { TubesPanel } from './TubesPanel';
 import { PrintPanel } from './PrintPanel';
 import { ScanPanel } from './ScanPanel';
 import { RecordsPanel } from './RecordsPanel';
+import { WorkspaceNavigation, workspaceViews } from './WorkspaceNavigation';
+import { WorkspaceOverview } from './WorkspaceOverview';
 import { CommandFeedback, errorText, NativeSelect, useCommand } from './shared';
 export function ExperimentsPage() {
   const { hasPermission } = useAuth();
@@ -34,7 +35,7 @@ export function ExperimentsPage() {
   const [form] = Form.useForm<{ projectCode: string; projectName: string }>();
   const [current, setCurrent] = useState<Session | null>(null);
   const experiment = experiments.find((e) => e.id === Number(params.get('experiment')));
-  const select = (id: number, tab = 'groups') => setParams({ experiment: String(id), tab });
+  const select = (id: number, tab = 'overview') => setParams({ experiment: String(id), tab });
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -74,20 +75,32 @@ export function ExperimentsPage() {
     void command.execute('/api/experiments', values);
   }
   return (
-    <Space direction="vertical" className="page-stack" size="middle">
-      <div className="experiment-page-title">
-        <Typography.Title level={2}>实验列表</Typography.Title>
-        <Button
-          type="primary"
-          disabled={!hasPermission('project:create') || command.busy || !!command.pending}
-          onClick={() => {
-            setCreating(true);
-            form.resetFields();
-          }}
-        >
-          添加实验
-        </Button>
-      </div>
+    <Space direction="vertical" className="page-stack experiment-page" size="middle">
+      <header className="workspace-page-header">
+        <div className="experiment-page-title">
+          <Typography.Title level={2}>{experiment ? '实验工作台' : '实验列表'}</Typography.Title>
+          <Button
+            disabled={!hasPermission('project:create') || command.busy || !!command.pending}
+            title={!hasPermission('project:create') ? '当前账号没有添加实验权限' : undefined}
+            onClick={() => {
+              setCreating(true);
+              form.resetFields();
+            }}
+          >
+            添加实验
+          </Button>
+        </div>
+        <NativeSelect
+          label="选择实验"
+          value={experiment ? String(experiment.id) : ''}
+          onChange={(value) => (value ? select(Number(value)) : setParams({}))}
+          options={experiments.map((e) => ({
+            value: String(e.id),
+            label: `${e.projectCode} · ${e.projectName}`,
+          }))}
+          placeholder="选择要操作的实验"
+        />
+      </header>
       {error && (
         <Alert
           type="error"
@@ -96,16 +109,6 @@ export function ExperimentsPage() {
         />
       )}
       <CommandFeedback command={command} allowed={hasPermission('project:create')} />
-      <NativeSelect
-        label="选择实验"
-        value={experiment ? String(experiment.id) : ''}
-        onChange={(value) => (value ? select(Number(value)) : setParams({}))}
-        options={experiments.map((e) => ({
-          value: String(e.id),
-          label: `${e.projectCode} · ${e.projectName}`,
-        }))}
-        placeholder="选择要操作的实验"
-      />
       {current?.state === 'FAILED' && (
         <Alert
           type="error"
@@ -127,7 +130,7 @@ export function ExperimentsPage() {
         <Workspace
           key={experiment.id}
           experiment={experiment}
-          tab={params.get('tab') || 'groups'}
+          tab={params.get('tab') || 'overview'}
           onTab={(tab) => select(experiment.id, tab)}
           onSession={setCurrent}
           onReturn={(session) =>
@@ -248,73 +251,72 @@ function Workspace({
       alive.current = false;
     };
   }, [refresh]);
-  const tabs = [
-    { key: 'groups', label: '分组关系' },
-    { key: 'purposes', label: '用途配对' },
-    { key: 'imports', label: '附件导入' },
-    { key: 'collection-tubes', label: '采血管' },
-    { key: 'aliquot-tubes', label: '分装管' },
-    { key: 'print', label: '标签打印' },
-    { key: 'collection', label: '采血核对' },
-    { key: 'aliquot', label: '血样处理核对' },
-    { key: 'records', label: '核对记录' },
-    { key: 'changes', label: '更改记录' },
-  ];
-  const activeTab = tabs.some((t) => t.key === tab) ? tab : 'groups';
+  const activeTab = workspaceViews.some((view) => view.key === tab) ? tab : 'overview';
   const props = { projectId: experiment.id, purposes, tubes, refresh };
   return (
-    <div className="content-panel experiment-workspace">
-      <Typography.Title level={3}>
-        {experiment.projectCode} · {experiment.projectName}
-      </Typography.Title>
-      <p className="experiment-context">
-        {current?.projectId === experiment.id
-          ? `最近核对条件：采样日期 ${current.collectDate} · 时间点 ${current.timePoint} · 用途 ${current.purposeSnapshot.name}`
-          : '请先维护分组与用途，上传采血及分装资料；核对前选择采样日期、时间点和用途。'}
-      </p>
-      <Tabs activeKey={activeTab} onChange={onTab} items={tabs} />
-      {error && (
-        <Alert
-          type="error"
-          message={error}
-          action={<Button onClick={() => void refresh().catch(() => {})}>重新加载实验资料</Button>}
-        />
-      )}
-      {loading && !ready ? (
-        <Spin />
-      ) : (
-        !error && (
-          <div key={activeTab}>
-            {activeTab === 'groups' && (
-              <GroupsPanel projectId={experiment.id} mappings={mappings} refresh={refresh} />
-            )}
-            {activeTab === 'purposes' && (
-              <PurposesPanel projectId={experiment.id} purposes={purposes} refresh={refresh} />
-            )}
-            {activeTab === 'imports' && <ImportsPanel {...props} />}
-            {activeTab === 'collection-tubes' && <TubesPanel {...props} kind="COLLECTION" />}
-            {activeTab === 'aliquot-tubes' && <TubesPanel {...props} kind="ALIQUOT" />}
-            {activeTab === 'print' && <PrintPanel {...props} />}
-            {(activeTab === 'collection' || activeTab === 'aliquot') && (
-              <ScanPanel
-                experiment={experiment}
-                stage={activeTab === 'collection' ? 'COLLECTION' : 'ALIQUOT'}
-                tubes={tubes}
-                purposes={purposes}
-                onSession={onSession}
-                onReturn={onReturn}
-              />
-            )}
-            {(activeTab === 'records' || activeTab === 'changes') && (
-              <RecordsPanel
-                projectId={experiment.id}
-                changes={activeTab === 'changes'}
-                purposes={purposes}
-              />
-            )}
-          </div>
-        )
-      )}
+    <div className="experiment-workspace">
+      <div className="workspace-trial-heading">
+        <span className="workspace-eyebrow">当前实验</span>
+        <Typography.Title level={3}>
+          {experiment.projectCode} · {experiment.projectName}
+        </Typography.Title>
+      </div>
+      <div className="workspace-layout">
+        <WorkspaceNavigation active={activeTab} onNavigate={onTab} />
+        <section className="workspace-main" aria-label="当前实验工作区">
+          {error && (
+            <Alert
+              type="error"
+              message={error}
+              action={<Button onClick={() => void refresh().catch(() => {})}>重新加载实验资料</Button>}
+            />
+          )}
+          {loading && !ready ? (
+            <Spin />
+          ) : (
+            !error && (
+              <div key={activeTab} className="workspace-view">
+                {activeTab === 'overview' && (
+                  <WorkspaceOverview
+                    mappings={mappings}
+                    purposes={purposes}
+                    tubes={tubes}
+                    current={current?.projectId === experiment.id ? current : null}
+                    onNavigate={onTab}
+                  />
+                )}
+                {activeTab === 'groups' && (
+                  <GroupsPanel projectId={experiment.id} mappings={mappings} refresh={refresh} />
+                )}
+                {activeTab === 'purposes' && (
+                  <PurposesPanel projectId={experiment.id} purposes={purposes} refresh={refresh} />
+                )}
+                {activeTab === 'imports' && <ImportsPanel {...props} />}
+                {activeTab === 'collection-tubes' && <TubesPanel {...props} kind="COLLECTION" />}
+                {activeTab === 'aliquot-tubes' && <TubesPanel {...props} kind="ALIQUOT" />}
+                {activeTab === 'print' && <PrintPanel {...props} />}
+                {(activeTab === 'collection' || activeTab === 'aliquot') && (
+                  <ScanPanel
+                    experiment={experiment}
+                    stage={activeTab === 'collection' ? 'COLLECTION' : 'ALIQUOT'}
+                    tubes={tubes}
+                    purposes={purposes}
+                    onSession={onSession}
+                    onReturn={onReturn}
+                  />
+                )}
+                {(activeTab === 'records' || activeTab === 'changes') && (
+                  <RecordsPanel
+                    projectId={experiment.id}
+                    changes={activeTab === 'changes'}
+                    purposes={purposes}
+                  />
+                )}
+              </div>
+            )
+          )}
+        </section>
+      </div>
     </div>
   );
 }

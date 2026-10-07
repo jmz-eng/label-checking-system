@@ -261,10 +261,13 @@ export function ScanPanel({
           ? session.lastResult
           : undefined;
   return (
-    <Space direction="vertical" className="page-stack" size="middle">
-      <Typography.Title level={4}>
-        {stage === 'COLLECTION' ? '采血核对' : '血样处理核对'}
-      </Typography.Title>
+    <Space direction="vertical" className="page-stack workspace-scan-panel" size="middle">
+      <div className="workspace-scan-heading">
+        <span className="workspace-eyebrow">现场核对</span>
+        <Typography.Title level={4}>
+          {stage === 'COLLECTION' ? '采血核对' : '血样处理核对'}
+        </Typography.Title>
+      </div>
       <Alert
         type="info"
         message={
@@ -288,7 +291,7 @@ export function ScanPanel({
           action={<Button onClick={() => onReturn(session)}>返回当前核对</Button>}
         />
       )}
-      <Space wrap className="experiment-toolbar">
+      <Space wrap className="experiment-toolbar workspace-scan-conditions">
         <NativeSelect
           label="采样日期"
           value={collectDate}
@@ -366,7 +369,7 @@ export function ScanPanel({
           message={humanizeApiMessage(result.message)}
         />
       )}
-      <div className="content-panel">
+      <div className="content-panel workspace-scanner">
         <label htmlFor="experiment-scanner">扫描内容</label>
         <Input
           id="experiment-scanner"
