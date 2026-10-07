@@ -1,6 +1,6 @@
 # 实验工作台布局 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 将现场核对入口作为实验页视觉主角，资料准备和追溯分组导航，改善布局与窄屏体验。
 
@@ -22,14 +22,18 @@
 
 **Interfaces:** Reuse Experiment/Mapping/Purpose/Tube/Session and useAuth; views keep existingtab names, new overview. Parent onTab callback changes query; no entrycard POST. Prepared business panel props/APIs remain unchanged. Navigation semanticrole can be button/link, tests must target actual intended accessible control (no fake Tabs retained only to pass oldtests).
 
-- [ ] First add failed tests for default experiment destination/overview, two maincards routingwithoutsessionPOST, groupnavigation and existing deep link/currentlocation. Capture meaningful RED before source edits.
-- [ ] Implement overview/groupnavigation and scoped appearance. Primary cards describe two scanning sequences and respect stage permissions; keep failed/in-progress recovery visible and all preparation/trace pages reachable. Do not invent readiness/calculatedsuccess states.
-- [ ] Improve scan form visualhierarchy only; preserve all state/command logic. Ensure narrowviewports/keyboardfocussupport and longChineseexperimentnames wrap. Do not modify barcode renderer/printrootstyles.
-- [ ] Adjust existing navigation tests to real controls, add permission/foreignfailedreturn/backforward/mobile tests and screenshots covering overview, preparation and scan pages. Keep existing failedround/pendingcommand/printlifecycle assertions.
-- [ ] Run env -u NO_COLOR npm test, npm run lint, npm run build. Review full desktop/mobile screenshots; fix actual defects and rerun coveringchecks. Commit only featurefiles and report evidence.
+- [x] First add failed tests for default experiment destination/overview, two maincards routingwithoutsessionPOST, groupnavigation and existing deep link/currentlocation. Capture meaningful RED before source edits.
+- [x] Implement overview/groupnavigation and scoped appearance. Primary cards describe two scanning sequences and respect stage permissions; keep failed/in-progress recovery visible and all preparation/trace pages reachable. Do not invent readiness/calculatedsuccess states.
+- [x] Improve scan form visualhierarchy only; preserve all state/command logic. Ensure narrowviewports/keyboardfocussupport and longChineseexperimentnames wrap. Do not modify barcode renderer/printrootstyles.
+- [x] Adjust existing navigation tests to real controls, add permission/foreignfailedreturn/backforward/mobile tests and screenshots covering overview, preparation and scan pages. Keep existing failedround/pendingcommand/printlifecycle assertions.
+- [x] Run env -u NO_COLOR npm test, npm run lint, npm run build. Review full desktop/mobile screenshots; fix actual defects and rerun coveringchecks. Commit only featurefiles and report evidence.
 
 ### Task 2: Review and local preview
 
-- [ ] Independent single whole-feature review (spec+quality) for navigation/state lifecycle/accessibility/printCSSscope; fix blocking findings with coveringtests.
-- [ ] Parent inspect desktop/mobile screenshots and code diff, verify localfrontend health, show updated local overview URL. No real5174automatedbrowser access after prior denial.
-- [ ] Update current use guide/developmentprogress, preserve branch, record limitations and previewlink for user. No push/deploy.
+- [x] Independent single whole-feature review (spec+quality) for navigation/state lifecycle/accessibility/printCSSscope; fix blocking findings with coveringtests.
+- [x] Parent inspect desktop/mobile screenshots and code diff, verify localfrontend health, show updated local overview URL. No real5174automatedbrowser access after prior denial.
+- [x] Update current use guide/developmentprogress, preserve branch, record limitations and previewlink for user. No push/deploy.
+
+## Completion evidence (2026-10-08)
+
+Implementation `9e78551`; mobile keyboard focus follow-up `2523e8e`. Complete frontend75-test run passed before the isolated focus fix; four relevant latest-source cases, lint and build passed after it. Six desktop/mobile screenshots inspected. Whole-feature spec/quality review and narrow follow-up approved, all findings closed. Local5174/8081 health200; overview open request queued for Codex preview. Dedicatedbranch retained, no push/deployment. Reports and logs are local review artifacts in `work/label-implementation`, not business data in Git.
