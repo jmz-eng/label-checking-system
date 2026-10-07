@@ -231,6 +231,32 @@ test('实验内导航分区且保留资料深链接与前进后退', async ({ pa
   await expect(page.getByRole('heading', { name: '选择现场核对任务' })).toBeVisible();
 });
 
+test('移动端键盘选择导航后折叠菜单并恢复可见焦点', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, 'overview');
+  const nav = page.getByRole('navigation', { name: '实验内导航' });
+  const toggle = nav.getByRole('button', { name: /实验导航/ });
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await nav.getByRole('button', { name: '分组关系', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/tab=groups$/);
+  await expect(page.getByRole('heading', { name: '动物与芯片分组关系', exact: true })).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toBeFocused();
+  // Resizing an expanded mobile menu must not focus the now-hidden desktop toggle.
+  await page.keyboard.press('Enter');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(toggle).toBeHidden();
+  const desktopItem = nav.getByRole('button', { name: '用途配对', exact: true });
+  await desktopItem.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/tab=purposes$/);
+  await expect(desktopItem).toBeFocused();
+});
+
 test('选择实验默认回工作台，无核对权限入口禁用并说明原因', async ({ page }) => {
   await open(page, 'groups', undefined, ['project:view']);
   await page.getByLabel('选择实验', { exact: true }).selectOption('');

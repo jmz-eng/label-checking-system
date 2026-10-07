@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   AppstoreOutlined,
   BarcodeOutlined,
@@ -49,9 +49,11 @@ export function WorkspaceNavigation({
   onNavigate: (key: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
   return (
     <nav aria-label="实验内导航" className={`workspace-navigation ${expanded ? 'is-expanded' : ''}`}>
       <button
+        ref={toggle}
         className="workspace-nav-toggle"
         aria-expanded={expanded}
         aria-controls="workspace-nav-groups"
@@ -72,6 +74,8 @@ export function WorkspaceNavigation({
                 onClick={() => {
                   onNavigate(item.key);
                   setExpanded(false);
+                  // Only the visible mobile toggle can receive the collapsed menu's focus.
+                  if (expanded && toggle.current?.getClientRects().length) toggle.current.focus();
                 }}
               >
                 {'icon' in item && item.icon}
