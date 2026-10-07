@@ -2,7 +2,7 @@
 
 用于按试验管理动物芯片对应关系、批量管标、采血核对、分装核对及历史追溯。原有采样任务与管理功能保留。前端包版本 `1.0.5`，后端包版本 `1.0.3`。
 
-新版从“实验列表”进入，操作说明见 [实验工作区使用说明](docs/experiment-workspace.md)，接口约定见 [实验接口文档](docs/experiment-api.md)。当前开发分支供本地预览验收，尚未部署服务器。
+新版从“实验列表”进入，操作说明见 [实验工作区使用说明](docs/experiment-workspace.md)，接口约定见 [实验接口文档](docs/experiment-api.md)。当前开发分支供本地预览验收，尚未部署服务器。当前成果及待办见 [开发进度](docs/development-progress.md)，三份模拟 Excel 见 [模拟样表](examples/experiment-demo/README.md)。
 
 ## 功能与技术栈
 
