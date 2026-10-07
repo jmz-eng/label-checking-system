@@ -11,7 +11,7 @@
 - 上传预览用 multipart 文本字段 requestId。失败事务不保留幂等结果；已提交的 FAIL、ABORT、REJECTED 均保留幂等结果。
 - 日期 `collectDate` 为 `yyyy-MM-dd`；时间戳 `createdAt`、`expiresAt` 为 ISO-8601 UTC。动物号/芯片号/时间点均为字符串，保留前导零。扫码 `content` 原文完整归档，匹配时只去除首尾空白。
 - 列表直接返回数组；当前版本不分页。筛选走查询参数，采用精确匹配；`keyword` 在归档 JSON 中查找子串。不要发送 page/pageSize 等未定义参数。
-- 服务端产生二维码、人员、结果、版本和时间。客户端传入的 actor/result/state/code 不构成写入依据。
+- 服务端产生标签码、条形码、人员、结果、版本和时间。客户端传入的 actor/result/state/code/barcode 不构成写入依据。
 - 只有请求确实保存成功后才能展示 PASS；网络失败展示“结果未确认”，用同 requestId 重试并读取会话。
 
 ## 实验、分组、用途
@@ -41,7 +41,7 @@ interface Purpose { id:string; projectId:number; name:string; collectionKeywords
 
 新增实验只需编号和名称，旧 `test_article` 自动存为空字符串。分组保证同实验内有效动物/芯片分别唯一；删除为停用，新关系不会改写旧扫码快照。用途关键词只是导入建议；用途定义和导入确认都需要明确确认，不能静默推断。采血/分装使用相同 purposeId 表示允许配对的一组用途；两类关键词可完全不同。
 
-## 管子、独立二维码、打印请求
+## 管子、独立标签码与条形码、打印请求
 
 | 方法与相对路径 | 权限 | 请求/结果 |
 |---|---|---|
@@ -66,7 +66,8 @@ interface Tube {
   id:string; projectId:number; projectCode:string; kind:Kind;
   animalNo:string; timePoint:string; labelInfo:string; collectDate:string;
   purposeId?:string; confirmed:boolean; sourceTubeId:string;
-  code:string; // E + 22位URL-safe标识，共23字符；二维码直接编码此字符串
+  code:string; // E + 22位URL-safe标识，共23字符；保留旧二维码身份，继续接受扫码
+  barcode:string; // 数据库登记的固定12位数字别名；当前标签用CODE128 C编码此字符串
   status:'ACTIVE'|'VOID'; printed:boolean; version:number; replacesId:string;
   createdAt:string; expiresAt?:string; voidReason?:string;
   importId?:string; sourceSheet?:string; sourceRow?:number;
@@ -77,7 +78,7 @@ interface PrintRequest {
 }
 ```
 
-管子所有内容更正均生成新 id/code，旧管作废并保留历史；**未打印管也采用此保守规则**。补打同一管再次调用 print-requests，使用新 requestId，code不变。printed表示已登记打印请求，不表示打印机实际完成。
+管子所有内容更正均生成新 id/code/barcode，旧管作废并保留历史；**未打印管也采用此保守规则**。补打同一管再次调用 print-requests，使用新 requestId，code/barcode不变。printed表示已登记打印请求，不表示打印机实际完成。barcode前导零必须保留。旧事件及打印快照不补写barcode；没有该字段的历史打印快照不能用于新条码打印，应从当前管子新建打印请求。
 
 未指定用途可暂存 confirmed=false 的待归类管，不能打印或核对。指定用途须confirmed=true。分装管未给 sourceTubeId 时，仅在同实验/动物/日期/时间点/用途的有效采血管恰好一支时自动配对；否则来源留空、禁止打印/核对，需 bulk assignments 或单管更正明确选择。一个来源可对应多支分装管。明确指定来源仍会校验全部条件。过期、作废、停用用途或失效来源禁止使用。批量操作上限1000条，原子提交。
 
@@ -192,7 +193,7 @@ interface Event {
 }
 ```
 
-事件追加写入，无更新/删除接口。期望快照含当时用途规则、分组版本、来源管；实际快照含扫描管五项内容、二维码和版本。原扫描内容保留。CSV包含主要检索列和完整archive JSON，单元格以=、+、-、@或控制字符开头时加单引号并做CSV引号转义。
+事件追加写入，无更新/删除接口。期望快照含当时用途规则、分组版本、来源管；实际快照含扫描管五项内容、标签码、当前条形码和版本。原扫描内容保留。完整的已登记TUBE条码关键字查询同时关联该管的旧身份记录，保留试验与其他筛选条件，不改写旧归档。CSV包含主要检索列和完整archive JSON，单元格以=、+、-、@或控制字符开头时加单引号并做CSV引号转义。
 
 ## 数据库升级与本地测试
 
