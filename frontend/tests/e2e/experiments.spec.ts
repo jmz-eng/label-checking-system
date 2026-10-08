@@ -1245,7 +1245,7 @@ test('更正可明确清除用途来源和失效时间，避免隐藏旧条件�
   expect(saved?.expiresAt).toBe('');
 });
 
-test('新入口默认进入实验列表，旧版工作台与系统管理仍分别可用', async ({ page }) => {
+test('新入口默认进入实验列表，侧栏撤下旧版入口且系统管理仍可用', async ({ page }) => {
   await open(page, 'groups', (path) =>
     path === '/api/menus/routes'
       ? [
@@ -1281,7 +1281,8 @@ test('新入口默认进入实验列表，旧版工作台与系统管理仍分�
   );
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '实验列表', exact: true })).toBeVisible();
-  await page.getByRole('menuitem', { name: '工作台（旧版）' }).click();
+  await expect(page.getByRole('menuitem', { name: /工作台/ })).toHaveCount(0);
+  await page.goto('/legacy-workbench');
   await expect(page).toHaveURL(/\/legacy-workbench$/);
   await expect(page.getByRole('heading', { name: '扫码核对', exact: true })).toBeVisible();
   await page.getByRole('menuitem', { name: '用户管理' }).click();

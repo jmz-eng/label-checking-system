@@ -47,22 +47,22 @@ function flattenMenus(menus: AppMenu[]): AppMenu[] {
   return menus.flatMap((menu) => [menu, ...flattenMenus(menu.children ?? [])]);
 }
 
+const legacyPageComponents = new Set([
+  'DashboardPage',
+  'ProjectsPage',
+  'SampleTasksPage',
+  'ScanWorkbenchPage',
+  'LabelPreviewPage',
+  'TracePage',
+  'ExceptionInterceptionPage',
+  'StatisticsReportPage',
+]);
+
 function toMenuItems(menus: AppMenu[]): MenuProps['items'] {
-  return menus.map((menu) => ({
+  return menus.filter((menu) => !legacyPageComponents.has(menu.component || '')).map((menu) => ({
     key: menu.menuKey,
     icon: menu.icon ? iconMap[menu.icon] : undefined,
-    label: [
-      'DashboardPage',
-      'ProjectsPage',
-      'SampleTasksPage',
-      'ScanWorkbenchPage',
-      'LabelPreviewPage',
-      'TracePage',
-      'ExceptionInterceptionPage',
-      'StatisticsReportPage',
-    ].includes(menu.component || '')
-      ? `${menu.menuName}（旧版）`
-      : menu.menuName,
+    label: menu.menuName,
     children: menu.children?.length ? toMenuItems(menu.children) : undefined,
   }));
 }
@@ -171,16 +171,7 @@ export function AppShell() {
         <Content className="app-content">
           <div className="app-content-inner">
             {selected?.component &&
-              [
-                'DashboardPage',
-                'ProjectsPage',
-                'SampleTasksPage',
-                'ScanWorkbenchPage',
-                'LabelPreviewPage',
-                'TracePage',
-                'ExceptionInterceptionPage',
-                'StatisticsReportPage',
-              ].includes(selected.component) && (
+              legacyPageComponents.has(selected.component) && (
                 <div className="legacy-workflow-note">
                   旧版资料与历史记录
                   {flatMenus.some((menu) => menu.component === 'ExperimentsPage') && (
