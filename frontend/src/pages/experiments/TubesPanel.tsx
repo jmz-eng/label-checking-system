@@ -1,3 +1,4 @@
+import { experimentPagination, searchText } from './shared';
 import { Alert, Button, Checkbox, Collapse, Form, Input, Modal, Space, Table, Tag } from 'antd';
 import { useState } from 'react';
 import { experimentPath } from '../../api/experiments';
@@ -75,10 +76,9 @@ export function TubesPanel({
     (t) =>
       t.kind === kind &&
       (!status || t.status === status) &&
-      `${t.projectCode} ${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.barcode ?? ""} ${t.code} ${t.id}`.includes(
-        search,
-      ),
+      searchText(`${t.projectCode} ${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.barcode ?? ""} ${t.code} ${t.id}`).includes(searchText(search)),
   );
+  const selectable = rows.filter((t) => t.status === 'ACTIVE');
   const sources = tubes.filter(
     (t) =>
       t.kind === 'COLLECTION' && t.status === 'ACTIVE' && t.confirmed && t.purposeId === purposeId,
@@ -173,6 +173,8 @@ export function TubesPanel({
         <Input.Search
           aria-label="查找管子"
           placeholder="动物、时间点、原始管标、日期或标签码"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
           onSearch={setSearch}
           allowClear
           style={{ width: 340 }}
@@ -193,6 +195,12 @@ export function TubesPanel({
       {validation && !editing && !voiding && <Alert type="error" message={validation} />}
       <Space wrap className="experiment-toolbar">
         <span>已选 {selected.length} 支（最多1000）</span>
+        <Button disabled={blocked || !selectable.length} onClick={() => setSelected(selectable.slice(0, 1000).map((t) => t.id))}>
+          全选筛选结果（最多1000支）
+        </Button>
+        <Button disabled={blocked || !selected.length} onClick={() => setSelected([])}>
+          清空选择
+        </Button>
         <NativeSelect
           label="批量用途"
           value={purposeId}
@@ -230,11 +238,7 @@ export function TubesPanel({
       <Table
         rowKey="id"
         dataSource={rows}
-        pagination={{
-          pageSize: 20,
-          showSizeChanger: true,
-          pageSizeOptions: [20, 50, 100],
-        }}
+        pagination={{ ...experimentPagination }}
         scroll={{ x: 1500 }}
         columns={[
           {
@@ -242,10 +246,11 @@ export function TubesPanel({
               <Checkbox
                 aria-label="选择筛选结果（最多1000支）"
                 checked={
-                  !!rows.length &&
-                  rows.filter((t) => t.status === 'ACTIVE').every((t) => selected.includes(t.id))
+                  !!selectable.length &&
+                  selectable.every((t) => selected.includes(t.id))
                 }
-                disabled={blocked}
+                disabled={blocked || !selectable.length}
+                indeterminate={selectable.some((t) => selected.includes(t.id)) && !selectable.every((t) => selected.includes(t.id))}
                 onChange={(e) =>
                   setSelected(
                     e.target.checked

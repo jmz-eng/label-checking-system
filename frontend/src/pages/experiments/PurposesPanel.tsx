@@ -1,3 +1,4 @@
+import { experimentPagination } from './shared';
 import { Alert, Button, Checkbox, Form, Input, Modal, Space, Table, Tag } from 'antd';
 import { useState } from 'react';
 import { experimentPath } from '../../api/experiments';
@@ -90,6 +91,7 @@ export function PurposesPanel({
       />
       <CommandFeedback command={command} allowed={hasPermission('sample:generate')} />
       <Table
+        pagination={{ ...experimentPagination }}
         rowKey="id"
         dataSource={purposes}
         scroll={{ x: 750 }}

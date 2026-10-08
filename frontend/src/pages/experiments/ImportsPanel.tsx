@@ -1,3 +1,4 @@
+import { experimentPagination } from './shared';
 import { Alert, Button, Checkbox, Input, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { experimentApi, experimentPath } from '../../api/experiments';
@@ -338,7 +339,7 @@ export function ImportsPanel({
                   render: (message: string) => humanizeApiMessage(message),
                 },
               ]}
-              pagination={{ pageSize: 20 }}
+              pagination={{ ...experimentPagination }}
             />
           )}
           {duplicates && (
@@ -353,7 +354,7 @@ export function ImportsPanel({
                 <Table
                   rowKey={(_, i) => String(i)}
                   dataSource={batch.duplicateRows}
-                  pagination={{ pageSize: 10 }}
+                  pagination={{ ...experimentPagination }}
                   scroll={{ x: 800 }}
                   columns={[
                     { title: '当前行', dataIndex: 'rowKey' },
@@ -432,7 +433,7 @@ export function ImportsPanel({
                 应用到选中行（{selected.length}）
               </Button>
               <Button disabled={busy} onClick={() => setSelected(batch.rows.map((r) => r.rowKey))}>
-                选择本批全部{batch.rows.length}行
+                全选本批全部{batch.rows.length}行
               </Button>
               <Button disabled={busy || !selected.length} onClick={() => setSelected([])}>
                 清空选择
@@ -453,11 +454,7 @@ export function ImportsPanel({
           <Table
             rowKey="rowKey"
             dataSource={batch.rows}
-            pagination={{
-              pageSize: 20,
-              showSizeChanger: true,
-              pageSizeOptions: [20, 50, 100],
-            }}
+            pagination={{ ...experimentPagination }}
             scroll={{ x: 1000 }}
             rowSelection={
               batch.kind === 'GROUP'
@@ -598,6 +595,7 @@ export function ImportsPanel({
       <Table
         rowKey="id"
         dataSource={history}
+        pagination={{ ...experimentPagination }}
         scroll={{ x: 750 }}
         columns={[
           { title: '原文件', dataIndex: 'fileName' },

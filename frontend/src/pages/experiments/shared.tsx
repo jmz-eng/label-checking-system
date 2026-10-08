@@ -1,9 +1,19 @@
 import { Alert, Button, Descriptions, Space, Typography } from 'antd';
+import type { TablePaginationConfig } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, http } from '../../api/http';
 import { useAuth } from '../../stores/AuthContext';
 import { createRequestId } from '../../utils/requestId';
 import type { Purpose, Tube } from '../../types/experiments';
+
+export const experimentPagination: TablePaginationConfig = {
+  defaultPageSize: 20,
+  showSizeChanger: true,
+  pageSizeOptions: [20, 50, 100, 200, 500],
+  showTotal: (total, range) => `共 ${total} 条，当前 ${range[0]}–${range[1]} 条`,
+};
+
+export const searchText = (value: string) => value.trim().toLocaleLowerCase();
 
 export function shanghaiTime(value?: string): string {
   if (!value) return '—';
@@ -26,7 +36,7 @@ export function NativeSelect({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   disabled?: boolean;
   placeholder?: string;
 }) {
@@ -41,7 +51,7 @@ export function NativeSelect({
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </option>
         ))}

@@ -1,3 +1,4 @@
+import { experimentPagination } from './shared';
 import { Alert, Button, Input, Modal, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { experimentApi, experimentPath } from '../../api/experiments';
@@ -205,7 +206,7 @@ export function RecordsPanel({
         loading={loading}
         rowKey="id"
         dataSource={records}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        pagination={{ ...experimentPagination }}
         scroll={{ x: 1050 }}
         columns={[
           { title: '采样日期', dataIndex: 'collectDate' },

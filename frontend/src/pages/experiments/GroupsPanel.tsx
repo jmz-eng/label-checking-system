@@ -1,3 +1,4 @@
+import { experimentPagination } from './shared';
 import { Alert, Button, Form, Input, Modal, Space, Table, Tag } from 'antd';
 import { useState } from 'react';
 import { experimentPath } from '../../api/experiments';
@@ -73,7 +74,7 @@ export function GroupsPanel({
       <Table
         rowKey="id"
         dataSource={mappings}
-        pagination={{ pageSize: 20 }}
+        pagination={{ ...experimentPagination }}
         scroll={{ x: 700 }}
         columns={[
           { title: '动物号', dataIndex: 'animalNo' },

@@ -1,3 +1,4 @@
+import { experimentPagination, searchText } from './shared';
 import {
   Alert,
   Button,
@@ -29,12 +30,16 @@ export function ExperimentsPage() {
   const { hasPermission } = useAuth();
   const [params, setParams] = useSearchParams();
   const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [form] = Form.useForm<{ projectCode: string; projectName: string }>();
   const [current, setCurrent] = useState<Session | null>(null);
   const experiment = experiments.find((e) => e.id === Number(params.get('experiment')));
+  const matchingExperiments = experiments.filter((e) => searchText(`${e.projectCode} ${e.projectName}`).includes(searchText(search)));
+  const selectableExperiments = experiment && !matchingExperiments.some((e) => e.id === experiment.id)
+    ? [experiment, ...matchingExperiments] : matchingExperiments;
   const select = (id: number, tab = 'overview') => setParams({ experiment: String(id), tab });
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,16 +95,27 @@ export function ExperimentsPage() {
             添加实验
           </Button>
         </div>
+        <Space wrap>
+          <Input.Search
+            aria-label="查找实验"
+            placeholder="按课题号或实验名称查找"
+            allowClear
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            style={{ width: 280 }}
+          />
         <NativeSelect
           label="选择实验"
           value={experiment ? String(experiment.id) : ''}
           onChange={(value) => (value ? select(Number(value)) : setParams({}))}
-          options={experiments.map((e) => ({
+          options={selectableExperiments.map((e) => ({
             value: String(e.id),
             label: `${e.projectCode} · ${e.projectName}`,
           }))}
           placeholder="选择要操作的实验"
         />
+          <span>匹配 {matchingExperiments.length} 个实验</span>
+        </Space>
       </header>
       {error && (
         <Alert
@@ -140,10 +156,11 @@ export function ExperimentsPage() {
         />
       ) : (
         <Table
+          pagination={{ ...experimentPagination }}
           rowKey="id"
-          dataSource={experiments}
+          dataSource={matchingExperiments}
           locale={{
-            emptyText: <Empty description="尚无实验，请添加实验后上传资料" />,
+            emptyText: <Empty description={searchText(search) ? "未找到匹配实验，请调整课题号或名称" : "尚无实验，请添加实验后上传资料"} />,
           }}
           columns={[
             { title: '试验编号', dataIndex: 'projectCode' },

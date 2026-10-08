@@ -619,7 +619,7 @@ test('导入批量用途能跨页选中全部45行并提交', async ({ page }) =
     }
   });
   await upload(page);
-  await page.getByRole('button', { name: '选择本批全部45行', exact: true }).click();
+  await page.getByRole('button', { name: '全选本批全部45行', exact: true }).click();
   await page.getByLabel('批量用途', { exact: true }).selectOption('p1');
   await page.getByRole('button', { name: '应用到选中行（45）', exact: true }).click();
   await expect(page.getByRole('button', { name: '确认用途并追加导入' })).toBeEnabled();
@@ -1746,3 +1746,99 @@ test('条形码可筛选当前管子，历史无别名的打印快照禁止猜�
   await expect(page.getByText(/缺少有效的12位条形码/).last()).toBeVisible();
   expect(prints).toBe(0);
 });
+
+
+for (const tab of ['groups', 'collection-tubes', 'aliquot-tubes', 'imports', 'print', 'records']) {
+  test(`每页数量可切换且真正显示50条：${tab}`, async ({ page }) => {
+    const many = Array.from({ length: 65 }, (_, i) => ({ ...(tab === 'aliquot-tubes' ? aliquot : tube), id: `many-${i}`, animalNo: String(i) }));
+    await open(page, tab, (path) => {
+      if (path.endsWith('/tubes')) return tab === 'aliquot-tubes' ? [tube, ...many] : many;
+      if (path.endsWith('/mappings')) return many.map((t) => ({ id:t.id, animalNo:t.animalNo, chipNo:`chip-${t.id}`, active:true, version:1 }));
+      if (path.endsWith('/imports/preview')) return { ...batch, rows:many.map((t,i) => ({ ...batch.rows[0], rowKey:`Sheet1:${i+2}`,sourceRow:i+2,animalNo:t.animalNo })) };
+      if (path.endsWith('/records')) return many.map((t) => ({ id:t.id, animalNo:t.animalNo, collectDate:t.collectDate, timePoint:t.timePoint, stage:'COLLECTION', result:'PASS', actorName:'测试员', createdAt:t.createdAt }));
+    });
+    if (tab === 'imports') await upload(page);
+    const table = page.getByRole('table').first();
+    await expect(table.locator('tbody tr.ant-table-row')).toHaveCount(20);
+    await page.locator('.ant-pagination-options-size-changer').first().click();
+    await page.getByRole('option', { name:'50 条/页', exact:true }).click();
+    await expect(table.locator('tbody tr.ant-table-row')).toHaveCount(50);
+    await page.getByRole('listitem', { name:'下一页', exact:true }).first().click();
+    await expect(table.locator('tbody tr.ant-table-row')).toHaveCount(15);
+    await page.locator('.ant-pagination-options-size-changer').first().click();
+    await page.getByRole('option', { name:'500 条/页', exact:true }).click();
+    await expect(table.locator('tbody tr.ant-table-row')).toHaveCount(65);
+  });
+}
+
+test('管子全选按钮跨页只选筛选内有效管，改变条数保持已选并可清空', async ({ page }) => {
+  const valid = Array.from({ length:45 }, (_,i) => ({ ...tube,id:`valid-${i}`,labelInfo:'筛选全血' }));
+  await open(page, 'collection-tubes', (path) => path.endsWith('/tubes') ? [...valid,{ ...tube,id:'void-tube',status:'VOID',labelInfo:'筛选全血' },{ ...tube,id:'other-tube',labelInfo:'其他' }] : undefined);
+  await page.getByRole('searchbox', { name:'查找管子' }).fill('筛选全血');
+  await page.getByRole('searchbox', { name:'查找管子' }).press('Enter');
+  await page.getByRole('button', { name:'全选筛选结果（最多1000支）', exact:true }).click();
+  await expect(page.getByText('已选 45 支（最多1000）', { exact:true })).toBeVisible();
+  await page.locator('.ant-pagination-options-size-changer').first().click();
+  await page.getByRole('option', { name:'100 条/页', exact:true }).click();
+  await expect(page.getByRole('checkbox', { name:/选择管子 valid-/ })).toHaveCount(45);
+  await expect(page.getByRole('checkbox', { name:'选择管子 void-tube', exact:true })).not.toBeChecked();
+  await page.getByRole('button', { name:'清空选择', exact:true }).click();
+  await expect(page.getByText('已选 0 支（最多1000）', { exact:true })).toBeVisible();
+});
+
+test('标签全选按钮跨页排除不可打印管，并可清空', async ({ page }) => {
+  const valid=Array.from({ length:25 }, (_,i) => ({ ...tube,id:`print-${i}` }));
+  await open(page, 'print', (path) => path.endsWith('/tubes') ? [...valid,{ ...tube,id:'void-print',status:'VOID' },{ ...tube,id:'unconfirmed',confirmed:false }] : undefined);
+  await page.getByRole('button', { name:'全选筛选结果（最多1000支）', exact:true }).click();
+  await expect(page.getByRole('heading', { name:'已选 25 支 · 按勾选顺序逐页打印' })).toBeVisible();
+  await expect(page.locator('.experiment-print-order li')).toHaveCount(25);
+  await page.getByRole('button', { name:'清空选择', exact:true }).click();
+  await expect(page.getByRole('heading', { name:'已选 0 支 · 按勾选顺序逐页打印' })).toBeVisible();
+});
+
+for (const tab of ['collection-tubes', 'aliquot-tubes', 'print']) {
+  test(`输入动物号即刻查找跨页记录且清空恢复：${tab}`, async ({ page }) => {
+    const many = Array.from({ length:45 }, (_,i) => ({ ...(tab==='aliquot-tubes'?aliquot:tube),id:`search-${i}`,animalNo:String(1000+i) }));
+    await open(page, tab, (path) => path.endsWith('/tubes') ? tab==='aliquot-tubes'?[tube,...many]:many : undefined);
+    const input=page.getByRole('searchbox', { name:tab==='print'?'查找打印管子':'查找管子',exact:true });
+    await input.fill(' 1044 ');
+    await expect(page.getByRole('table').first().locator('tbody tr.ant-table-row')).toHaveCount(1);
+    await expect(page.getByRole('cell', { name:'1044',exact:true })).toBeVisible();
+    await input.fill('nothing');
+    await expect(page.getByRole('table').first().locator('tbody tr.ant-table-row')).toHaveCount(0);
+    await input.fill('');
+    await expect(page.getByRole('table').first().locator('tbody tr.ant-table-row')).toHaveCount(20);
+  });
+}
+
+test('实验按课题号实时查找，进入后也能筛选切换实验', async ({ page }) => {
+  const experiments=[experiment,{...experiment,id:8,projectCode:'STUDY-XYZ',projectName:'另一个实验'}];
+  await open(page,'overview',(path)=>path==='/api/experiments'?experiments:undefined);
+  await page.getByLabel('选择实验',{exact:true}).selectOption('');
+  await page.getByRole('searchbox',{name:'查找实验',exact:true}).fill(' study-xy ');
+  await expect(page.getByRole('table').locator('tbody tr.ant-table-row')).toHaveCount(1);
+  await expect(page.getByRole('cell',{name:'STUDY-XYZ',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'进入实验',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'STUDY-XYZ · 另一个实验',exact:true})).toBeVisible();
+  await page.getByRole('searchbox',{name:'查找实验',exact:true}).fill('demo');
+  await page.getByLabel('选择实验',{exact:true}).selectOption('7');
+  await expect(page.getByRole('heading',{name:'DEMO-001 · 实验演示',exact:true})).toBeVisible();
+});
+
+for(const stage of ['collection','aliquot']) {
+  test(`时间点按原列完整展示日期分布，切换日期重置条件：${stage}`,async({page})=>{
+    const model=stage==='collection'?tube:aliquot;
+    const rows=[{...model,id:'date1',collectDate:'2026-10-05',timePoint:'分组后'},...['D1-0.5hr','D1-1hr','D1-2hr'].map((timePoint,i)=>({...model,id:`date2-${i}`,collectDate:'2026-10-06',timePoint}))];
+    await open(page,stage,(path)=>path.endsWith('/tubes')?rows:undefined);
+    await expect(page.getByText('2026-10-06：D1-0.5hr、D1-1hr、D1-2hr',{exact:true})).toBeVisible();
+    await page.getByLabel('采样日期',{exact:true}).selectOption('2026-10-05');
+    await expect(page.getByLabel('时间点',{exact:true}).locator('option')).toHaveCount(5);
+    await expect(page.getByLabel('时间点',{exact:true}).locator('option[value="D1-1hr"]')).toHaveAttribute('disabled', '');
+    await page.getByRole('button',{name:'选择日期 2026-10-06',exact:true}).click();
+    await page.getByLabel('时间点',{exact:true}).selectOption('D1-1hr');
+    await page.getByLabel('本次用途',{exact:true}).selectOption('p1');
+    await page.getByRole('button',{name:'选择日期 2026-10-05',exact:true}).click();
+    await expect(page.getByLabel('时间点',{exact:true})).toHaveValue('');
+    await expect(page.getByLabel('本次用途',{exact:true})).toHaveValue('');
+  });
+}

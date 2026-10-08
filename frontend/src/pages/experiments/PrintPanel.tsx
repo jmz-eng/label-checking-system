@@ -1,3 +1,4 @@
+import { experimentPagination, searchText } from './shared';
 import { Alert, Button, Checkbox, Input, Pagination, Space, Table, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -151,7 +152,7 @@ export function PrintPanel({
   const rows = tubes.filter(
     (t) =>
       (!kind || t.kind === kind) &&
-      `${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.barcode ?? ""} ${t.code}`.includes(search),
+      searchText(`${t.projectCode} ${t.animalNo} ${t.timePoint} ${t.labelInfo} ${t.collectDate} ${t.barcode ?? ""} ${t.code} ${t.id}`).includes(searchText(search)),
   );
   function select(ids: string[]) {
     setSelected(ids);
@@ -180,7 +181,11 @@ export function PrintPanel({
           placeholder="全部管子"
         />
         <Input.Search
+          aria-label="查找打印管子"
+          allowClear
           placeholder="动物、时间点、管标、日期或短码"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
           onSearch={setSearch}
           style={{ width: 320 }}
         />
@@ -195,7 +200,7 @@ export function PrintPanel({
             )
           }
         >
-          选择筛选结果（最多1000支）
+          全选筛选结果（最多1000支）
         </Button>
         <Button disabled={busy} onClick={() => select([])}>
           清空选择
@@ -204,7 +209,7 @@ export function PrintPanel({
       <Table
         rowKey="id"
         dataSource={rows}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        pagination={{ ...experimentPagination }}
         scroll={{ x: 950 }}
         columns={[
           {
@@ -336,6 +341,7 @@ export function PrintPanel({
       <Table
         rowKey="id"
         dataSource={history}
+        pagination={{ ...experimentPagination }}
         columns={[
           { title: '请求编号', dataIndex: 'id' },
           {
