@@ -22,21 +22,34 @@ public class ExperimentController {
     final ExperimentDataService data;
     final ExperimentSessionService sessions;
     final ExperimentImportService imports;
+    final ExperimentLifecycleService lifecycle;
 
     public ExperimentController(
             ExperimentRepository r,
             ExperimentDataService data,
             ExperimentSessionService sessions,
-            ExperimentImportService imports) {
+            ExperimentImportService imports,
+            ExperimentLifecycleService lifecycle) {
         this.r = r;
         this.data = data;
         this.sessions = sessions;
         this.imports = imports;
+        this.lifecycle = lifecycle;
     }
 
     @GetMapping
-    public ApiResponse<?> list() {
-        return ApiResponse.ok(data.projects());
+    public ApiResponse<?> list(@RequestParam(defaultValue = "false") boolean deleted) {
+        return ApiResponse.ok(data.projects(deleted));
+    }
+
+    @PostMapping("/{p}/delete")
+    public ApiResponse<?> delete(@PathVariable long p, @RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(lifecycle.change(p, body, false));
+    }
+
+    @PostMapping("/{p}/restore")
+    public ApiResponse<?> restore(@PathVariable long p, @RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(lifecycle.change(p, body, true));
     }
 
     @PostMapping

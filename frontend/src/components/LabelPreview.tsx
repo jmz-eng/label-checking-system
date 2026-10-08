@@ -13,7 +13,7 @@ export function LabelPreview({ task }: { task: SampleTask }) {
           <path data-barcode="true" d={layout.barcodePath} fill="#000" shapeRendering="crispEdges"
             transform={`translate(${layout.barcodeX} ${layout.barcodeY})`} />
           {layout.lines.map((line, index) => (
-            <text key={index} x={layout.textX} y={line.y} fill="#000" fontFamily="Arial, Microsoft YaHei, sans-serif"
+            <text key={index} x={layout.textX} textAnchor="middle" y={line.y} fill="#000" fontFamily="Arial, Microsoft YaHei, sans-serif"
               fontSize={line.fontSize} fontWeight={line.bold ? 700 : 400}
               textLength={line.width || undefined} lengthAdjust="spacingAndGlyphs">{line.text}</text>
           ))}

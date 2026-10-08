@@ -183,6 +183,17 @@ async function open(
   await page.goto(`/experiments?experiment=7&tab=${tab}`);
   await expect(page.getByRole('heading', { name: 'DEMO-001 · 实验演示' })).toBeVisible();
 }
+async function navigateWorkspace(page: Page, name: string) {
+  const nav = page.getByRole('navigation', { name:'实验内导航' });
+  const toggle = nav.getByRole('button', { name:/实验导航/ });
+  if (await toggle.isVisible() && await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+  if (['工作台','采血核对','血样处理核对'].includes(name)) {
+    await nav.getByRole('button', {name,exact:true}).click();
+  } else {
+    await nav.getByRole('button',{name:/核对记录|更改记录/.test(name)?'追溯记录':'实验准备',exact:true}).click();
+    await page.getByRole('menuitem',{name,exact:true}).click();
+  }
+}
 async function context(page: Page) {
   await page.getByLabel('采样日期', { exact: true }).selectOption('2026-10-05');
   await page.getByLabel('时间点', { exact: true }).selectOption('1h');
@@ -213,6 +224,7 @@ test('HTTP环境没有randomUUID时可保存实验，刷新重试保留原请求
     }
     return saved ? [created, experiment] : [experiment];
   });
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
   await page.getByRole('button', { name: '添加实验', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '添加实验' });
   await dialog.getByLabel('试验编号', { exact: true }).fill('HTTP-001');
@@ -225,6 +237,8 @@ test('HTTP环境没有randomUUID时可保存实验，刷新重试保留原请求
   expect(bodies).toHaveLength(2);
   expect(bodies[0]).toEqual(bodies[1]);
   expect(bodies[0].requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  await expect(page.getByRole('button', { name: '添加实验', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
   await expect(page.getByRole('button', { name: '添加实验', exact: true })).toBeEnabled();
 });
 
@@ -267,46 +281,34 @@ test('工作台首页默认突出两个核对入口，入口导航不创建会�
   expect(starts).toBe(0);
 });
 
-test('实验内导航分区且保留资料深链接与前进后退', async ({ page }) => {
-  await open(page, 'collection-tubes');
-  const nav = page.getByRole('navigation', { name: '实验内导航' });
-  for (const name of ['现场核对', '实验准备', '追溯记录'])
-    await expect(nav.getByRole('heading', { name, exact: true })).toBeVisible();
-  await expect(nav.getByRole('button', { name: '采血管', exact: true })).toHaveAttribute('aria-current', 'page');
-  await nav.getByRole('button', { name: '用途配对', exact: true }).click();
+test('顶部导航分组且保留资料深链接与前进后退', async ({ page }) => {
+  await open(page,'collection-tubes');
+  for (const name of ['实验准备','追溯记录','采血核对']) await expect(page.getByRole('navigation',{name:'实验内导航'}).getByRole('button',{name,exact:true})).toBeVisible();
+  await navigateWorkspace(page,'用途配对');
   await expect(page).toHaveURL(/tab=purposes$/);
   await page.goBack();
-  await expect(nav.getByRole('button', { name: '采血管', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading',{name:'采血管列表'})).toBeVisible();
   await page.goForward();
-  await expect(nav.getByRole('button', { name: '用途配对', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading',{name:'用途与允许配对规则'})).toBeVisible();
   await page.goto('/experiments?experiment=7&tab=unknown');
-  await expect(page.getByRole('heading', { name: '选择现场核对任务' })).toBeVisible();
+  await expect(page.getByRole('heading',{name:'选择现场核对任务'})).toBeVisible();
 });
 
-test('移动端键盘选择导航后折叠菜单并恢复可见焦点', async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
-  await open(page, 'overview');
-  const nav = page.getByRole('navigation', { name: '实验内导航' });
-  const toggle = nav.getByRole('button', { name: /实验导航/ });
-  await toggle.focus();
-  await page.keyboard.press('Enter');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await nav.getByRole('button', { name: '分组关系', exact: true }).focus();
-  await page.keyboard.press('Enter');
+test('移动端键盘选择顶部导航后折叠并恢复可见焦点', async ({ page }) => {
+  await page.setViewportSize({width:375,height:812});
+  await open(page,'overview');
+  const nav = page.getByRole('navigation',{name:'实验内导航'});
+  const toggle = nav.getByRole('button',{name:/实验导航/});
+  await toggle.focus(); await page.keyboard.press('Enter');
+  await nav.getByRole('button',{name:'实验准备',exact:true}).click();
+  await page.getByRole('menuitem',{name:'分组关系',exact:true}).focus(); await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/tab=groups$/);
-  await expect(page.getByRole('heading', { name: '动物与芯片分组关系', exact: true })).toBeVisible();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded','false');
   await expect(toggle).toBeFocused();
-  // Resizing an expanded mobile menu must not focus the now-hidden desktop toggle.
-  await page.keyboard.press('Enter');
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({width:1440,height:1000});
   await expect(toggle).toBeHidden();
-  const desktopItem = nav.getByRole('button', { name: '用途配对', exact: true });
-  await desktopItem.focus();
-  await page.keyboard.press('Enter');
+  await navigateWorkspace(page,'用途配对');
   await expect(page).toHaveURL(/tab=purposes$/);
-  await expect(desktopItem).toBeFocused();
 });
 
 test('选择实验默认回工作台，无核对权限入口禁用并说明原因', async ({ page }) => {
@@ -388,7 +390,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 375, height: 812
       await nav.getByRole('button', { name: /实验导航/ }).click();
       await expect(nav.getByRole('button', { name: /实验导航/ })).toHaveAttribute('aria-expanded', 'true');
     }
-    await nav.getByRole('button', { name: '分组关系', exact: true }).click();
+    await navigateWorkspace(page,'分组关系');
     await expect(page.getByRole('heading', { name: '动物与芯片分组关系', exact: true })).toBeVisible();
     await capture('preparation');
     if (viewport.width < 1000) {
@@ -411,12 +413,12 @@ test('长中文实验名称在窄屏完整换行并保留两个入口', async ({
 
 test('实验选择和当前工作页在刷新后保留，窄屏仍能打开导航', async ({ page }) => {
   await open(page);
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '采血管' }).click();
+  await navigateWorkspace(page,'采血管');
   await page.reload();
-  await expect(page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '采血管' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading',{name:'采血管列表'})).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: '打开导航' }).click();
-  await expect(page.getByRole('dialog').getByText('实验列表')).toBeVisible();
+  await navigateWorkspace(page,'工作台');
+  await expect(page.getByRole('button',{name:'返回实验列表',exact:true})).toBeVisible();
 });
 test('开始采血要求独立选择日期时间点用途', async ({ page }) => {
   let starts = 0;
@@ -895,9 +897,9 @@ test('追溯筛选与CSV保持相同条件，详情使用不可变快照和上�
 test('无操作权限仍能看实验，扫码导入编辑打印入口不可操作', async ({ page }) => {
   await open(page, 'collection', undefined, ['project:view']);
   await expect(page.getByRole('button', { name: '开始采血核对' })).toBeDisabled();
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '附件导入' }).click();
+  await navigateWorkspace(page, '附件导入');
   await expect(page.getByText('当前账号没有附件导入权限', { exact: true })).toBeVisible();
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '采血管' }).click();
+  await navigateWorkspace(page,'采血管');
   await expect(page.getByRole('button', { name: '新增采血管' })).toBeDisabled();
 });
 
@@ -1077,7 +1079,7 @@ test('分组更正保留原因和历史，用途规则需要明确确认', async
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(mappingBody?.chipNo).toBe('0000456');
   expect(mappingBody?.reason).toBe('更换芯片');
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '用途配对' }).click();
+  await navigateWorkspace(page, '用途配对');
   await page.getByRole('button', { name: '新增用途' }).click();
   await page.getByRole('dialog').getByLabel('用途名称').fill('安全性');
   await page.getByRole('dialog').getByLabel('采血管关键词（每行一个）').fill('全血\n血常规');
@@ -1283,6 +1285,9 @@ test('新入口默认进入实验列表，侧栏撤下旧版入口且系统管�
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '实验列表', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: /工作台/ })).toHaveCount(0);
+  await page.getByRole('button',{name:/系统管理/}).click();
+  await page.getByRole('menuitem',{name:'用户管理',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'用户管理',exact:true})).toBeVisible();
   await page.goto('/legacy-workbench');
   await expect(page).toHaveURL(/\/legacy-workbench$/);
   await expect(page.getByRole('heading', { name: '扫码核对', exact: true })).toBeVisible();
@@ -1310,7 +1315,7 @@ test('真实timePoint不一致报错在扫码和历史详情中显示中文，�
     if (path.endsWith('/records/real-error')) return failedEvent;
   });
   await expect(page.getByText('时间点不一致', { exact: true })).toBeVisible();
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '核对记录' }).click();
+  await navigateWorkspace(page, '核对记录');
   await expect(page.getByText('时间点不一致', { exact: true })).toBeVisible();
   await expect(page.getByText('设备返回ZX特殊状态', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '详情 real-error' }).click();
@@ -1521,7 +1526,7 @@ test('延迟打印POST切页后不自动打印，返回原身份显式恢复且�
   await page.getByRole('checkbox', { name: '选择标签 t1' }).check();
   await page.getByRole('button', { name: '登记打印请求并打开打印' }).click();
   await expect.poll(() => posts).toBe(1);
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '采血管', exact: true }).click();
+  await navigateWorkspace(page,'采血管');
   const settled = page.waitForResponse((response) => response.request().method() === 'POST');
   release();
   await settled;
@@ -1540,7 +1545,7 @@ test('延迟打印POST切页后不自动打印，返回原身份显式恢复且�
       () => JSON.parse(sessionStorage.getItem('experiment-action:1:7:print') || 'null')?.body,
     ),
   ).toEqual(bodies[0]);
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '标签打印', exact: true }).click();
+  await navigateWorkspace(page, '标签打印');
   await expect(page.getByRole('button', { name: '打开已登记请求 saved-print' })).toBeDisabled();
   await page.getByRole('button', { name: '重试原操作' }).click();
   await expect
@@ -1624,8 +1629,8 @@ for (const outcome of ['成功', '网络失败', '拒绝']) {
     await page.getByRole('checkbox', { name: '选择标签 t1' }).check();
     await page.getByRole('button', { name: '登记打印请求并打开打印' }).click();
     await expect.poll(() => bodies.length).toBe(1);
-    await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '采血管', exact: true }).click();
-    await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '标签打印', exact: true }).click();
+    await navigateWorkspace(page,'采血管');
+    await navigateWorkspace(page, '标签打印');
     await page.getByRole('button', { name: '重试原操作' }).click();
     await expect(page.getByRole('button', { name: '重试原操作' })).toHaveCount(0);
     await page.getByRole('checkbox', { name: '选择标签 t1' }).check();
@@ -1689,7 +1694,7 @@ test('卸载扫码旧响应不再启动权威读取回调，原请求仍能安�
   await page.getByLabel('扫描内容').fill('0000123');
   await page.getByLabel('扫描内容').press('Enter');
   await expect.poll(() => bodies.length).toBe(1);
-  await page.getByRole('navigation', { name: '实验内导航' }).getByRole('button', { name: '采血管', exact: true }).click();
+  await navigateWorkspace(page,'采血管');
   const getsBeforeOldResponse = currentGets;
   const settled = page.waitForResponse((response) => response.request().method() === 'POST');
   release();
@@ -1837,6 +1842,7 @@ for(const stage of ['collection','aliquot']) {
     const model=stage==='collection'?tube:aliquot;
     const rows=[{...model,id:'date1',collectDate:'2026-10-05',timePoint:'分组后'},...['D1-0.5hr','D1-1hr','D1-2hr'].map((timePoint,i)=>({...model,id:`date2-${i}`,collectDate:'2026-10-06',timePoint}))];
     await open(page,stage,(path)=>path.endsWith('/tubes')?rows:undefined);
+    await page.getByText('操作说明与采样日期／时间点',{exact:true}).click();
     await expect(page.getByText('2026-10-06：D1-0.5hr、D1-1hr、D1-2hr',{exact:true})).toBeVisible();
     await page.getByLabel('采样日期',{exact:true}).selectOption('2026-10-05');
     await expect(page.getByLabel('时间点',{exact:true}).locator('option')).toHaveCount(5);
@@ -1849,3 +1855,251 @@ for(const stage of ['collection','aliquot']) {
     await expect(page.getByLabel('本次用途',{exact:true})).toHaveValue('');
   });
 }
+
+test('仅ADMIN角色可见删除及已删除实验入口，通配权限不替代管理员', async ({ page }) => {
+  await open(page, 'overview');
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
+  await expect(page.getByRole('button', { name: '删除实验', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '已删除实验', exact: true })).toHaveCount(0);
+});
+
+test('管理员确认删除带原因，取消不提交，网络重试保持原身份并可恢复', async ({ page }) => {
+  let removed = false;
+  const bodies: Body[] = [];
+  await open(page, 'overview', (path, body, method, query) => {
+    if (path === '/api/auth/me') return { id: 1, username: 'admin-test', realName: '测试管理员', roles: ['ADMIN'], permissions: ['*'] };
+    if (path === '/api/experiments') return query.get('deleted') === 'true'
+      ? removed ? [{ ...experiment, status: 'DELETED' }] : [] : removed ? [] : [experiment];
+    if (path.endsWith('/delete') && method === 'POST') {
+      bodies.push(body); removed = true;
+      if (bodies.length === 1) return 'NETWORK';
+      return { ...experiment, status: 'DELETED' };
+    }
+    if (path.endsWith('/restore') && method === 'POST') {
+      bodies.push(body); removed = false; return experiment;
+    }
+  });
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
+  await page.getByRole('button', { name: '删除实验', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '删除实验', exact: true });
+  await expect(dialog.getByText(/DEMO-001/)).toBeVisible();
+  await dialog.getByRole('button', { name: /^取\s*消$/ }).click();
+  expect(bodies).toHaveLength(0);
+  await page.getByRole('button', { name: '删除实验', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '确认删除', exact: true })).toBeDisabled();
+  await dialog.getByLabel('操作原因', { exact: true }).fill('误建测试实验');
+  await dialog.getByRole('checkbox', { name: /我确认删除/ }).check();
+  await dialog.getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '重试原操作', exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '重试原操作', exact: true }).click();
+  await expect(page.getByRole('button', { name: '进入实验', exact: true })).toHaveCount(0);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).toEqual(bodies[1]);
+  expect(bodies[0].reason).toBe('误建测试实验');
+  await page.getByRole('button', { name: '已删除实验', exact: true }).click();
+  await page.getByRole('button', { name: '核对记录', exact: true }).click();
+  await expect(page.getByText('实验已删除，仅可查看追溯记录；需管理员恢复后才能继续操作。')).toBeVisible();
+  await expect(page.getByRole('button', { name: '采血核对', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '标签打印', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
+  await page.getByRole('button', { name: '恢复实验', exact: true }).click();
+  const restore = page.getByRole('dialog', { name: '恢复实验', exact: true });
+  await restore.getByLabel('操作原因', { exact: true }).fill('恢复测试');
+  await restore.getByRole('checkbox', { name: /我确认恢复/ }).check();
+  await restore.getByRole('button', { name: '确认恢复', exact: true }).click();
+  await expect(page.getByRole('button', { name: '恢复实验', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '正常实验', exact: true }).click();
+  await expect(page.getByRole('button', { name: '进入实验', exact: true })).toBeVisible();
+  expect(bodies).toHaveLength(3);
+});
+
+test('服务器拒绝活动实验删除时保留列表并显示原因', async ({ page }) => {
+  await open(page, 'overview', (path) => {
+    if (path === '/api/auth/me') return { id: 1, roles: ['ADMIN'], permissions: ['*'] };
+    if (path.endsWith('/delete')) return { httpStatus: 409 };
+  });
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
+  await page.getByRole('button', { name: '删除实验', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '删除实验', exact: true });
+  await dialog.getByLabel('操作原因', { exact: true }).fill('删除测试');
+  await dialog.getByRole('checkbox', { name: /我确认删除/ }).check();
+  await dialog.getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(dialog.getByText('重复内容，请明确确认追加', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '进入实验', exact: true })).toBeVisible();
+});
+
+const importedAliquots = Array.from({ length: 320 }, (_, i) => ({
+  ...aliquot, id: `imported-aliquot-${i}`, labelInfo: `血浆-${i + 1}`,
+  barcode: String(1000 + i).padStart(12, '0'),
+}));
+
+test('后台已导入但页面未获确认时，切换分装与打印重读320支资料', async ({ page }) => {
+  let committed = false;
+  let writes = 0;
+  await open(page, 'imports', (path, _body, method) => {
+    if (method === 'POST') writes++;
+    if (path.endsWith('/tubes')) return committed ? [tube, ...importedAliquots] : [tube];
+  });
+  committed = true;
+  const nav = page.getByRole('navigation', { name: '实验内导航' });
+  await navigateWorkspace(page,'分装管');
+  await expect(page.getByText('共 320 条，当前 1–20 条', { exact: true })).toBeVisible();
+  await navigateWorkspace(page,'标签打印');
+  await page.getByLabel('打印管子类型', { exact: true }).selectOption('ALIQUOT');
+  await expect(page.getByText('共 320 条，当前 1–20 条', { exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: '选择标签 imported-aliquot-0', exact: true })).toBeEnabled();
+  expect(writes).toBe(0);
+});
+
+test('提交分装期间离开附件页，响应确认后更新当前列表并原编号重试', async ({ page }) => {
+  let committed = false;
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const bodies: Body[] = [];
+  const preview = { ...batch, kind: 'ALIQUOT', fileName: '分装.xlsx' };
+  const saved = { ...preview, status: 'COMMITTED', entityIds: importedAliquots.map((t) => t.id) };
+  await open(page, 'imports', async (path, body) => {
+    if (path.endsWith('/tubes')) return committed ? [tube, ...importedAliquots] : [tube];
+    if (path.endsWith('/imports/preview')) return preview;
+    if (path.endsWith('/imports')) return committed ? [saved] : [];
+    if (path.endsWith('/commit')) {
+      bodies.push(body);
+      if (bodies.length === 1) {
+        entered();
+        await gate;
+        committed = true;
+      }
+      return saved;
+    }
+  });
+  await upload(page);
+  await page.getByRole('button', { name: '确认用途并追加导入', exact: true }).click();
+  await started;
+  const nav = page.getByRole('navigation', { name: '实验内导航' });
+  await navigateWorkspace(page,'分装管');
+  await expect(page.getByRole('heading', { name: '分装管列表', exact: true })).toBeVisible();
+  release();
+  await expect(page.getByText('共 320 条，当前 1–20 条', { exact: true })).toBeVisible();
+  await navigateWorkspace(page,'附件导入');
+  await page.getByRole('button', { name: '重试原操作', exact: true }).click();
+  await expect(page.getByRole('button', { name: '重试原操作', exact: true })).toHaveCount(0);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).toEqual(bodies[1]);
+  await navigateWorkspace(page,'标签打印');
+  await page.getByLabel('打印管子类型', { exact: true }).selectOption('ALIQUOT');
+  await expect(page.getByText('共 320 条，当前 1–20 条', { exact: true })).toBeVisible();
+});
+
+for (const tab of ['groups', 'collection-tubes', 'aliquot-tubes', 'print']) {
+  test(`原表顺序经过分页和筛选仍保持：${tab}`, async ({ page }) => {
+    const fileOrder = Array.from({ length: 25 }, (_, i) => ({
+      ...(tab === 'aliquot-tubes' ? aliquot : tube),
+      id: `source-${25-i}`,
+      animalNo: String(((i * 7) % 25) + 1).padStart(3, '0'),
+      barcode: String(1000 + i).padStart(12, '0'),
+    }));
+    for (const row of fileOrder) row.labelInfo = row.animalNo.includes('01') ? '筛选目标' : '其他样品';
+    await open(page, tab, (path) => {
+      if (path.endsWith('/tubes')) return tab === 'aliquot-tubes' ? [tube, ...fileOrder] : fileOrder;
+      if (path.endsWith('/mappings')) return fileOrder.map(t => ({ id:t.id,animalNo:t.animalNo,chipNo:`chip-${t.id}`,active:true,version:1 }));
+    });
+    const table = page.getByRole('table').first();
+    const rows = table.locator('tbody tr.ant-table-row');
+    for (let i = 0; i < 20; i++) await expect(rows.nth(i).getByRole('cell', { name:fileOrder[i].animalNo,exact:true })).toBeVisible();
+    await page.getByRole('listitem', { name:'下一页',exact:true }).first().click();
+    for (let i = 20; i < 25; i++) await expect(rows.nth(i-20).getByRole('cell', { name:fileOrder[i].animalNo,exact:true })).toBeVisible();
+    if (tab !== 'groups') {
+      await page.getByRole('searchbox', { name:tab==='print'?'查找打印管子':'查找管子',exact:true }).fill('筛选目标');
+      const matches = fileOrder.filter(t => t.animalNo.includes('01'));
+      await expect(rows).toHaveCount(matches.length);
+      for (let i = 0; i < matches.length; i++) await expect(rows.nth(i).getByRole('cell', { name:matches[i].animalNo,exact:true })).toBeVisible();
+    }
+  });
+}
+
+test('全选标签的预览、提交和实体打印顺序与原表一致', async ({ page }) => {
+  const fileOrder = ['900','100','700','200'].map((animalNo,i) => ({
+    ...tube, id:`source-${4-i}`,animalNo,barcode:String(1000+i).padStart(12,'0'),
+  }));
+  let submitted: unknown;
+  await open(page, 'print', (path, body, method) => {
+    if (path.endsWith('/tubes')) return fileOrder;
+    if (path.endsWith('/print-requests') && method === 'POST') {
+      submitted = body.tubeIds;
+      return { id:'ordered-print',status:'REQUEST_ACKNOWLEDGED',tubes:fileOrder,createdAt:tube.createdAt };
+    }
+  });
+  await page.evaluate(() => { window.print = () => {}; });
+  await page.getByRole('button', { name:'全选筛选结果（最多1000支）',exact:true }).click();
+  const selected = page.locator('.experiment-print-order li');
+  await expect(selected).toHaveCount(4);
+  for (let i=0;i<4;i++) await expect(selected.nth(i)).toContainText(fileOrder[i].animalNo);
+  await page.getByRole('button', { name:'登记打印请求并打开打印' }).click();
+  await expect(page.getByText(/已登记打印请求/).first()).toBeVisible();
+  expect(submitted).toEqual(fileOrder.map(t => t.id));
+  await expect(page.locator('#experiment-print-root .experiment-tube-label')).toHaveCount(4);
+  for (let i=0;i<4;i++) await expect(page.locator('#experiment-print-root .experiment-tube-label').nth(i)).toHaveAttribute('data-barcode',fileOrder[i].barcode);
+});
+
+for (const stage of ['collection','aliquot']) {
+  test(`扫码条件默认按原表首次出现顺序排列：${stage}`, async ({ page }) => {
+    const model = stage === 'collection' ? tube : aliquot;
+    const rows = [
+      { ...model,id:'order-a',collectDate:'2026-10-07',timePoint:'6h' },
+      { ...model,id:'order-b',collectDate:'2026-10-05',timePoint:'1h' },
+      { ...model,id:'order-c',collectDate:'2026-10-07',timePoint:'4h' },
+      { ...model,id:'order-d',collectDate:'2026-10-06',timePoint:'2h' },
+    ];
+    await open(page,stage,(path) => path.endsWith('/tubes') ? rows : undefined);
+    await expect(page.getByLabel('采样日期',{exact:true}).locator('option')).toHaveText(['请选择','2026-10-07','2026-10-05','2026-10-06']);
+    await expect(page.getByLabel('时间点',{exact:true}).locator('option')).toHaveText(['请选择','6h','1h','4h','2h']);
+  });
+}
+
+test('条码下所有文字居中且位于单张标签边界内', async ({ page }) => {
+  await open(page,'print');
+  await page.getByRole('checkbox',{name:'选择标签 t1',exact:true}).check();
+  const geometry = await page.locator('.experiment-label-artwork').first().evaluate(svg => {
+    const width = (svg as SVGSVGElement).viewBox.baseVal.width;
+    return Array.from(svg.querySelectorAll('text')).map(text => {
+      const box = text.getBBox();
+      return {center:box.x+box.width/2,expected:width/2,left:box.x,right:box.x+box.width,width};
+    });
+  });
+  expect(geometry).toHaveLength(4);
+  for (const line of geometry) {
+    expect(line.center).toBeCloseTo(line.expected,0);
+    expect(line.left).toBeGreaterThanOrEqual(3);
+    expect(line.right).toBeLessThanOrEqual(line.width-3);
+  }
+});
+
+for (const tab of ['collection-tubes','aliquot-tubes']) {
+  test(`管子表格完整显示且桌面不需要横向拖动：${tab}`, async ({ page }) => {
+    await page.setViewportSize({width:1280,height:900});
+    const row = {...(tab==='aliquot-tubes'?aliquot:tube),id:'width-check',animalNo:'3102',labelInfo:'T-00-P-a 完整原样样品信息'};
+    await open(page,tab,(path) => path.endsWith('/tubes') ? [tube,row] : undefined);
+    const dimensions = await page.locator('table').first().evaluate(table => ({width:table.getBoundingClientRect().width,available:table.parentElement!.clientWidth,scroll:table.parentElement!.scrollWidth}));
+    expect(dimensions.width).toBeLessThanOrEqual(dimensions.available+1);
+    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.available+1);
+    await expect(page.getByRole('cell',{name:row.labelInfo,exact:true})).toBeVisible();
+    await page.setViewportSize({width:375,height:812});
+    const narrow = await page.getByRole('searchbox',{name:'查找管子'}).evaluate(input => ({right:input.closest('.ant-input-search')!.getBoundingClientRect().right,available:document.documentElement.clientWidth}));
+    expect(narrow.right).toBeLessThanOrEqual(narrow.available);
+    await expect(page.getByText(row.labelInfo,{exact:true})).toBeVisible();
+  });
+}
+
+test('实验页面撤掉外层侧栏，扫码框位于页面中上部',async({page}) => {
+  await page.setViewportSize({width:1440,height:900});
+  await open(page,'collection',(path) => path.endsWith('/sessions/current') || path.endsWith('/sessions/s1') ? session : undefined);
+  await expect(page.locator('.app-sider')).toHaveCount(0);
+  await expect(page.getByLabel('扫描内容',{exact:true})).toBeEnabled();
+  const scan = await page.getByLabel('扫描内容',{exact:true}).boundingBox();
+  expect(scan!.y).toBeLessThan(520);
+  expect(Math.abs(scan!.x+scan!.width/2-720)).toBeLessThan(10);
+  await expect(page.getByLabel('扫描内容',{exact:true})).toBeEnabled();
+});

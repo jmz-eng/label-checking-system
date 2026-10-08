@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Button, Dropdown } from 'antd';
 import {
   AppstoreOutlined,
   BarcodeOutlined,
@@ -6,6 +7,7 @@ import {
   FileSearchOutlined,
   SettingOutlined,
   RightOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 
 export const workspaceGroups = [
@@ -41,48 +43,41 @@ export const workspaceGroups = [
 ];
 export const workspaceViews = workspaceGroups.flatMap((group) => group.items);
 
-export function WorkspaceNavigation({
-  active,
-  onNavigate,
-}: {
-  active: string;
-  onNavigate: (key: string) => void;
+export function WorkspaceNavigation({ active, onNavigate, readOnly = false }: {
+  active: string; onNavigate: (key: string) => void; readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
+  function choose(key: string) {
+    onNavigate(key);
+    setExpanded(false);
+    // Wait for the dropdown's keyboard event and focus restoration to finish.
+    if (expanded) setTimeout(() => toggle.current?.focus(), 50);
+  }
   return (
-    <nav aria-label="实验内导航" className={`workspace-navigation ${expanded ? 'is-expanded' : ''}`}>
-      <button
-        ref={toggle}
-        className="workspace-nav-toggle"
-        aria-expanded={expanded}
-        aria-controls="workspace-nav-groups"
-        onClick={() => setExpanded(!expanded)}
-      >
+    <nav aria-label="实验内导航" className={`workspace-navigation workspace-top-navigation ${expanded ? 'is-expanded' : ''}`}>
+      <button ref={toggle} className="workspace-nav-toggle" aria-expanded={expanded}
+        aria-controls="workspace-nav-groups" onClick={() => setExpanded(!expanded)}>
         <AppstoreOutlined aria-hidden="true" /> 实验导航
-        <span>{workspaceViews.find((view) => view.key === active)?.label}</span>
+        <span>{workspaceViews.find(view => view.key === active)?.label}</span>
         <RightOutlined aria-hidden="true" />
       </button>
       <div id="workspace-nav-groups" className="workspace-nav-groups">
-        {workspaceGroups.map((group) => (
-          <section key={group.name}>
-            <h4>{group.icon} {group.name}</h4>
-            {group.items.map((item) => (
-              <button
-                key={item.key}
-                aria-current={active === item.key ? 'page' : undefined}
-                onClick={() => {
-                  onNavigate(item.key);
-                  setExpanded(false);
-                  // Only the visible mobile toggle can receive the collapsed menu's focus.
-                  if (expanded && toggle.current?.getClientRects().length) toggle.current.focus();
-                }}
-              >
-                {'icon' in item && item.icon}
-                <span>{item.label}</span>
-                {active === item.key && <RightOutlined aria-hidden="true" className="workspace-current-marker" />}
+        {workspaceGroups.filter(group => !readOnly || group.name === '追溯记录').map(group => (
+          <section key={group.name} className={group.name === '现场核对' ? 'workspace-primary-nav' : 'workspace-secondary-nav'}>
+            {group.name === '现场核对' ? group.items.map(item => (
+              <button key={item.key} aria-current={active === item.key ? 'page' : undefined} onClick={() => choose(item.key)}>
+                {'icon' in item && item.icon}<span>{item.label}</span>
               </button>
-            ))}
+            )) : <Dropdown trigger={['click']} menu={{
+              selectedKeys:[active],
+              items:group.items.map(item => ({key:item.key,label:item.label})),
+              onClick:({key}) => choose(key),
+            }}>
+              <Button aria-label={group.name} className={group.items.some(item => item.key===active) ? 'workspace-group-active' : ''}>
+                {group.icon}{group.name}<DownOutlined />
+              </Button>
+            </Dropdown>}
           </section>
         ))}
       </div>

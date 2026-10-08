@@ -16,6 +16,54 @@ import java.util.concurrent.*;
 class ExperimentMutationRaceTest extends ExperimentTestSupport {
     @SpyBean ExperimentRepository repository;
 
+    @Test
+    void deletionAndStartCannotBothCommit() throws Exception {
+        String p = project(), u = purpose(p), auth = secondToken();
+        var replies = race(
+                () -> postAs(token, "/" + p + "/delete", Map.of("reason", "测试删除", "confirmed", true)),
+                () -> postAs(auth, "/" + p + "/sessions", Map.of("stage", "COLLECTION", "collectDate", "2026-10-05", "timePoint", "1h", "purposeId", u)));
+        assertEquals(List.of(200, 409), replies.stream().map(Reply::status).sorted().toList());
+    }
+
+    @Test
+    void deletionAndNextRoundCannotBothCommit() throws Exception {
+        String p = project(), u = purpose(p), auth = secondToken();
+        mapping(p);
+        var t = tube(p, u, "COLLECTION", null, "2026-10-05");
+        String s = start(p, u, "COLLECTION").path("id").asText();
+        call("/sessions/" + s + "/chip", Map.of("content", "000123"));
+        call("/sessions/" + s + "/tube", Map.of("content", t.path("code").asText()));
+        var replies = race(
+                () -> postAs(auth, "/" + p + "/delete", Map.of("reason", "测试删除", "confirmed", true)),
+                () -> postAs(token, "/sessions/" + s + "/next", Map.of()));
+        assertEquals(List.of(200, 409), replies.stream().map(Reply::status).sorted().toList());
+    }
+
+    @Test
+    void printPausedBeforeTubeLockIsRejectedAfterDeletion() throws Exception {
+        String p = project(), u = purpose(p), auth = secondToken();
+        mapping(p);
+        var t = tube(p, u, "COLLECTION", null, "2026-10-05");
+        String id = t.path("id").asText();
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        doAnswer(inv -> {
+            if (Thread.currentThread().getName().equals("paused-deletion-print")) {
+                entered.countDown(); assertTrue(release.await(10, TimeUnit.SECONDS));
+            }
+            return inv.callRealMethod();
+        }).when(repository).lockTubes(anyCollection());
+        var pool = Executors.newSingleThreadExecutor(r -> new Thread(r, "paused-deletion-print"));
+        try {
+            var print = pool.submit(() -> postAs(auth, "/" + p + "/print-requests", Map.of("tubeIds", List.of(id))));
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            assertEquals(200, postAs(token, "/" + p + "/delete", Map.of("reason", "删除测试", "confirmed", true)).status());
+            release.countDown();
+            assertEquals(409, print.get(10, TimeUnit.SECONDS).status());
+            assertEquals(0, repository.list("print", Long.parseLong(p)).size());
+        } finally { release.countDown(); pool.shutdownNow(); }
+    }
+
     String secondToken() {
         jdbc.update(
                 "MERGE INTO sys_user(id,username,password_hash,real_name,status) KEY(id)"

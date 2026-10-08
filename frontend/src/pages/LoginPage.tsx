@@ -1,7 +1,7 @@
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Form, Input, Typography, message } from 'antd';
 import { useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../stores/AuthContext';
 
 interface LoginFormValues {
@@ -13,8 +13,6 @@ export function LoginPage() {
   const { user, login } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -24,7 +22,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(values.username, values.password);
-      navigate(from, { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       message.error(error instanceof Error ? error.message : '登录失败');
     } finally {

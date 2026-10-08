@@ -10,7 +10,7 @@ import type {
 } from '../types/experiments';
 export const experimentPath = (id: number) => `/api/experiments/${id}`;
 export const experimentApi = {
-  list: () => http.get<Experiment[]>('/api/experiments'),
+  list: (deleted = false) => http.get<Experiment[]>(`/api/experiments${deleted ? '?deleted=true' : ''}`),
   mappings: (id: number) => http.get<Mapping[]>(`${experimentPath(id)}/mappings`),
   purposes: (id: number) => http.get<Purpose[]>(`${experimentPath(id)}/purposes`),
   tubes: (id: number) => http.get<Tube[]>(`${experimentPath(id)}/tubes`),

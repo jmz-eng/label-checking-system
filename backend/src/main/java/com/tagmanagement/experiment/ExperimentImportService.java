@@ -49,6 +49,7 @@ public class ExperimentImportService {
                 "import.preview." + p,
                 fields("requestId", request, "kind", kind, "name", name, "hash", hash),
                 () -> {
+                    r.lockProject(p);
                     var project = r.project(p);
                     List<Map<String, Object>> rows = new ArrayList<>(), issues = new ArrayList<>();
                     Set<String> animals = new HashSet<>(), chips = new HashSet<>();

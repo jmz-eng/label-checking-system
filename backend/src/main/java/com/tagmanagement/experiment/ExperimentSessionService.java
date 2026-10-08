@@ -84,7 +84,7 @@ public class ExperimentSessionService {
                 "session.start." + p,
                 b,
                 () -> {
-                    r.project(p);
+                    r.lockProject(p);
                     if (own().stream().anyMatch(s -> "FAILED".equals(s.get("state"))))
                         throw BusinessException.conflict("尚有失败轮次，须纠正通过或填写原因异常结束");
                     ExperimentDataService.date(required(b, "collectDate"));
@@ -317,6 +317,7 @@ public class ExperimentSessionService {
                 "session.next." + id,
                 b,
                 () -> {
+                    r.lockProject(number(r.get("session", id).get("projectId")));
                     var s = r.lock("session", id);
                     owner(s);
                     authoritative(s);

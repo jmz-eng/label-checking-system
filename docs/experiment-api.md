@@ -18,7 +18,10 @@
 
 | 方法与相对路径 | 权限 | 请求/结果 |
 |---|---|---|
-| GET `/` | project:view | Experiment[] |
+| GET `/` | project:view | Experiment[]，排除DELETED |
+| GET `/?deleted=true` | project:view + ADMIN角色 | 仅DELETED的Experiment[] |
+| POST `/{p}/delete` | project:view + ADMIN角色 | `{requestId,reason,confirmed:true}` → DELETED的Experiment |
+| POST `/{p}/restore` | project:view + ADMIN角色 | `{requestId,reason,confirmed:true}` → 恢复原状态的Experiment |
 | POST `/` | project:create | `{requestId,projectCode,projectName}` → Experiment |
 | GET `/{p}` | project:view | Experiment |
 | GET `/{p}/mappings` | project:view | Mapping[]，含已停用行 |
@@ -38,6 +41,8 @@ interface Mapping { id:string; projectId:number; animalNo:string; chipNo:string;
 interface Purpose { id:string; projectId:number; name:string; collectionKeywords:string[];
   aliquotKeywords:string[]; confirmed:boolean; active:boolean; version:number; createdAt:string }
 ```
+
+删除/恢复为可恢复的状态变更，均记录PROJECT_DELETE/PROJECT_RESTORE事件、人员、原因、服务器时间及前后实验快照。非ADMIN返回403；缺少原因或明确确认返回400；状态不符、存在IN_PROGRESS/FAILED核对时删除返回409。保留原件与全部业务记录，保留试验编号唯一性，不物理删除数据库行。删除后新导入预览/提交、资料写入、打印、开始及下一轮核对均返回409；已保存原请求仍按原requestId返回原结果。只读历史接口保留各自既有权限。此功能本地待发布，无数据库结构迁移。
 
 新增实验只需编号和名称，旧 `test_article` 自动存为空字符串。分组保证同实验内有效动物/芯片分别唯一；删除为停用，新关系不会改写旧扫码快照。用途关键词只是导入建议；用途定义和导入确认都需要明确确认，不能静默推断。采血/分装使用相同 purposeId 表示允许配对的一组用途；两类关键词可完全不同。
 

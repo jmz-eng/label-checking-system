@@ -41,7 +41,7 @@ interface LabelFields {
 export function createBarcodeLabelLayout(barcode: string | undefined, source: LabelFields): LabelLayout {
   const result: LabelLayout = {
     barcodePath: '', barcodeWidth: 0, barcodeX: 0, barcodeY: EDGE_DOTS,
-    textX: EDGE_DOTS, lines: [],
+    textX: LABEL_WIDTH_DOTS / 2, lines: [],
   };
   if (!barcode || !/^[0-9]{12}$/.test(barcode)) {
     return { ...result, error: '缺少有效的12位条形码，不能打印。历史快照未保存条形码时，请从当前管子重新登记打印请求。' };

@@ -101,6 +101,8 @@ class BarcodeListConnectionTest {
         var jdbc = new JdbcTemplate(ds);
         jdbc.execute("CREATE TABLE exp_tube(id VARCHAR(64) PRIMARY KEY, project_id BIGINT,"
                 + " payload VARCHAR(1000), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+        jdbc.execute("CREATE TABLE exp_import(id VARCHAR(64) PRIMARY KEY, project_id BIGINT,"
+                + " payload VARCHAR(1000), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
         jdbc.execute("CREATE TABLE label_barcode(id BIGINT PRIMARY KEY AUTO_INCREMENT,"
                 + " namespace VARCHAR(20), entity_id VARCHAR(64), UNIQUE(namespace,entity_id))");
         jdbc.update("INSERT INTO exp_tube(id,project_id,payload) VALUES ('t1',1,?)",

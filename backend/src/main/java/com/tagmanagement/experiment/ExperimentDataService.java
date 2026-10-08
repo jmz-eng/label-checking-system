@@ -20,9 +20,14 @@ public class ExperimentDataService {
     }
 
     public List<Map<String, Object>> projects() {
+        return projects(false);
+    }
+
+    public List<Map<String, Object>> projects(boolean deleted) {
+        if (deleted) ExperimentLifecycleService.requireAdmin();
         return r.jdbc()
                 .query(
-                        "SELECT id FROM project_info ORDER BY id DESC",
+                        "SELECT id FROM project_info WHERE status " + (deleted ? "=" : "<>") + " 'DELETED' ORDER BY id DESC",
                         (rs, n) -> r.project(rs.getLong(1)));
     }
 
@@ -388,14 +393,16 @@ public class ExperimentDataService {
                 "print." + p,
                 b,
                 () -> {
-                    r.project(p);
+                    r.requireActiveProject(p);
                     Object ids = b.get("tubeIds");
                     if (!(ids instanceof List<?> list) || list.isEmpty() || list.size() > 1000)
                         throw BusinessException.badRequest("tubeIds需1至1000项");
                     var locked = r.lockTubes((List<String>) list);
+                    r.requireActiveProject(p);
                     r.lockPurposes(locked.values().stream().map(t -> str(t, "purposeId")).toList());
                     List<Map<String, Object>> snapshots = new ArrayList<>();
-                    for (String id : new TreeSet<>((List<String>) list)) {
+                    // Locks are already acquired in sorted order; snapshots keep selection order.
+                    for (String id : new LinkedHashSet<>((List<String>) list)) {
                         var t = locked.get(id);
                         if (number(t.get("projectId")) != p)
                             throw BusinessException.notFound("当前实验中不存在该数据");

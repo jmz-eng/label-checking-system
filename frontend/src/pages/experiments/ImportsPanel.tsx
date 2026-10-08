@@ -123,6 +123,10 @@ export function ImportsPanel({
       }
     },
     `${projectId}:import-commit`,
+    false,
+    async (value) => {
+      if (value.status === 'COMMITTED') await refresh();
+    },
   );
   const busy = loading || command.busy || !!command.pending || uploadUnknown;
   const duplicates = !!batch && (batch.duplicate || !!batch.duplicateRows?.length);
@@ -302,15 +306,18 @@ export function ImportsPanel({
         <Alert message={message} type={batch?.status === 'COMMITTED' ? 'success' : 'info'} />
       )}
       {batch && (
-        <div className="content-panel">
-          <Typography.Title level={4}>
-            {batch.fileName} · {kindNames[batch.kind]}
-          </Typography.Title>
-          <Space wrap>
-            <Tag>{importStatus[batch.status]}</Tag>
-            <span>
-              {batch.rows.length} 行 · 批次 {batch.id}
-            </span>
+        <div className="content-panel import-batch-panel">
+          <header className="import-batch-header">
+            <div className="import-batch-heading">
+              <span className="import-batch-kind">{kindNames[batch.kind]}</span>
+              <Typography.Title level={4}>{batch.fileName}</Typography.Title>
+              <div className="import-batch-summary">
+                <Tag color={batch.status === 'COMMITTED' ? 'green' : batch.status === 'PREVIEW' ? 'blue' : 'red'}>
+                  {importStatus[batch.status]}
+                </Tag>
+                <span>共 {batch.rows.length} 行</span>
+              </div>
+            </div>
             <Button
               onClick={() =>
                 void http
@@ -323,7 +330,8 @@ export function ImportsPanel({
             >
               下载当前原附件
             </Button>
-          </Space>
+          </header>
+          <div className="import-batch-id"><span>批次编号</span><code>{batch.id}</code></div>
           {!![...batch.issues, ...(batch.commitIssues || [])].length && (
             <Table
               data-testid="import-issues"
@@ -396,60 +404,75 @@ export function ImportsPanel({
             </div>
           )}
           {batch.kind !== 'GROUP' && batch.status !== 'COMMITTED' && (
-            <Space wrap className="experiment-toolbar">
-              <NativeSelect
-                label="批量用途"
-                value={bulkPurpose}
-                onChange={(v) => {
-                  setBulkPurpose(v);
-                  setBulkSource('');
-                }}
-                options={purposeOptions(purposes)}
-                disabled={busy}
-              />
-              {batch.kind === 'ALIQUOT' && (
-                <NativeSelect
-                  label="批量来源采血管"
-                  value={bulkSource}
-                  onChange={setBulkSource}
-                  options={tubes
-                    .filter(
-                      (t) =>
-                        t.kind === 'COLLECTION' &&
-                        t.status === 'ACTIVE' &&
-                        t.purposeId === bulkPurpose,
-                    )
-                    .map((t) => ({
-                      value: t.id,
-                      label: `${t.animalNo} · ${t.collectDate} · ${t.timePoint} · ${t.id}`,
-                    }))}
-                  disabled={busy}
-                />
-              )}
-              <Button
-                disabled={busy || !selected.length}
-                onClick={applyBulk}
-              >
-                应用到选中行（{selected.length}）
-              </Button>
-              <Button disabled={busy} onClick={() => setSelected(batch.rows.map((r) => r.rowKey))}>
-                全选本批全部{batch.rows.length}行
-              </Button>
-              <Button disabled={busy || !selected.length} onClick={() => setSelected([])}>
-                清空选择
-              </Button>
-              <Input.Search
-                placeholder="按动物或管标筛选后勾选"
-                onSearch={(value) =>
-                  setSelected(
-                    batch.rows
-                      .filter((r) => `${r.animalNo} ${r.labelInfo}`.includes(value))
-                      .map((r) => r.rowKey),
-                  )
-                }
-                style={{ width: 260 }}
-              />
-            </Space>
+            <div className="import-batch-tools">
+              <section className="import-tool-section" aria-label="批次行选择">
+                <div className="import-tool-heading">
+                  <strong><span>1</span>选择数据行</strong>
+                  <span className="import-selection-count">已选 {selected.length} / {batch.rows.length} 行</span>
+                </div>
+                <div className="import-selection-controls">
+                  <Input.Search
+                    aria-label="按动物或管标选中行"
+                    placeholder="按动物或管标筛选后勾选"
+                    onSearch={(value) =>
+                      setSelected(
+                        batch.rows
+                          .filter((r) => `${r.animalNo} ${r.labelInfo}`.includes(value))
+                          .map((r) => r.rowKey),
+                      )
+                    }
+                  />
+                  <Button disabled={busy} onClick={() => setSelected(batch.rows.map((r) => r.rowKey))}>
+                    全选本批全部{batch.rows.length}行
+                  </Button>
+                  <Button disabled={busy || !selected.length} onClick={() => setSelected([])}>
+                    清空选择
+                  </Button>
+                </div>
+                <p>输入后按回车选中匹配行，也可在下方列表中勾选。</p>
+              </section>
+              <section className="import-tool-section" aria-label="批量设置管子信息">
+                <div className="import-tool-heading"><strong><span>2</span>设置批量信息</strong></div>
+                <div className="import-bulk-controls">
+                  <NativeSelect
+                    label="批量用途"
+                    value={bulkPurpose}
+                    onChange={(v) => {
+                      setBulkPurpose(v);
+                      setBulkSource('');
+                    }}
+                    options={purposeOptions(purposes)}
+                    disabled={busy}
+                  />
+                  {batch.kind === 'ALIQUOT' && (
+                    <NativeSelect
+                      label="批量来源采血管"
+                      value={bulkSource}
+                      onChange={setBulkSource}
+                      options={tubes
+                        .filter(
+                          (t) =>
+                            t.kind === 'COLLECTION' &&
+                            t.status === 'ACTIVE' &&
+                            t.purposeId === bulkPurpose,
+                        )
+                        .map((t) => ({
+                          value: t.id,
+                          label: `${t.animalNo} · ${t.collectDate} · ${t.timePoint} · ${t.id}`,
+                        }))}
+                      disabled={busy}
+                    />
+                  )}
+                  <Button
+                    type="primary"
+                    disabled={busy || !selected.length}
+                    onClick={applyBulk}
+                  >
+                    应用到选中行（{selected.length}）
+                  </Button>
+                </div>
+              </section>
+            </div>
           )}
           <Table
             rowKey="rowKey"

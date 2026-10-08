@@ -159,13 +159,19 @@ public class ExperimentRepository {
     }
 
     public List<Map<String, Object>> list(String type, long project) {
+        var rows = storedList(type, project);
+        if (type.equals("mapping") || type.equals("tube"))
+            ExperimentDisplayOrder.sort(rows, storedList("import", project));
+        // Release query connections before alias lookups, retaining transactional row locks.
+        rows.forEach(row -> live(type, row));
+        return rows;
+    }
+
+    private List<Map<String, Object>> storedList(String type, long project) {
         var rows = jdbc.query(
                 "SELECT payload FROM " + table(type) + " WHERE project_id=? ORDER BY created_at,id",
                 (r, n) -> decode(r.getString(1)),
                 project);
-        // Release the nontransactional query connection before alias lookups. A caller's
-        // transaction still retains its connection and row locks through the usual JDBC binding.
-        rows.forEach(row -> live(type, row));
         return rows;
     }
 
@@ -298,6 +304,17 @@ public class ExperimentRepository {
     }
 
     public void lockProject(long p) {
+        lockProjectForLifecycle(p);
+        requireActiveProject(p);
+    }
+
+    public void requireActiveProject(long p) {
+        if ("DELETED".equals(project(p).get("status")))
+            throw BusinessException.conflict("实验已删除，只能查看历史记录；需管理员恢复后再操作");
+    }
+
+    public void lockProjectForLifecycle(long p) {
+        project(p);
         jdbc.queryForObject("SELECT id FROM project_info WHERE id=? FOR UPDATE", Long.class, p);
     }
 

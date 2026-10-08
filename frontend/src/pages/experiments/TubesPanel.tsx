@@ -169,7 +169,7 @@ export function TubesPanel({
         type="info"
         message="每支管有独立标签码。内容更正或替换会生成新身份并作废旧码；补打同一支管请在标签打印页选择原管，保持原标签码。采样日期始终是原始采血日期。"
       />
-      <Space wrap>
+      <Space wrap className="experiment-tube-filters">
         <Input.Search
           aria-label="查找管子"
           placeholder="动物、时间点、原始管标、日期或标签码"
@@ -177,7 +177,7 @@ export function TubesPanel({
           onChange={(event) => setSearch(event.target.value)}
           onSearch={setSearch}
           allowClear
-          style={{ width: 340 }}
+          style={{ width: '100%' }}
         />
         <NativeSelect
           label="管子状态"
@@ -239,9 +239,11 @@ export function TubesPanel({
         rowKey="id"
         dataSource={rows}
         pagination={{ ...experimentPagination }}
-        scroll={{ x: 1500 }}
+        className="experiment-tubes-table"
+        tableLayout="fixed"
         columns={[
           {
+            width: '4%',
             title: (
               <Checkbox
                 aria-label="选择筛选结果（最多1000支）"
@@ -276,27 +278,30 @@ export function TubesPanel({
               />
             ),
           },
-          { title: '试验编号', dataIndex: 'projectCode' },
-          { title: '动物号', dataIndex: 'animalNo' },
-          { title: '时间点', dataIndex: 'timePoint' },
+          { title: '试验编号', dataIndex: 'projectCode', width: '15%' },
+          { title: '动物号', dataIndex: 'animalNo', width: '7%' },
+          { title: '时间点', dataIndex: 'timePoint', width: '9%' },
           {
             title: '管标信息（原文）',
+            width: '16%',
             dataIndex: 'labelInfo',
             render: (v: string) => <span className="preserve-text">{v}</span>,
           },
-          { title: '采样日期', dataIndex: 'collectDate' },
+          { title: '采样日期', dataIndex: 'collectDate', width: '10%' },
           {
             title: '用途 / 来源',
+            width: '10%',
             render: (_, t) => (
               <>
                 {purposes.find((p) => p.id === t.purposeId)?.name || '待归类'}
                 <br />
-                {kind === 'ALIQUOT' ? t.sourceTubeId || '待明确配对' : ''}
+                {kind === 'ALIQUOT' ? (() => { const source = tubes.find(source => source.id === t.sourceTubeId); return source ? `${source.animalNo} · ${source.timePoint} · ${source.barcode || source.id}` : '待明确配对'; })() : ''}
               </>
             ),
           },
           {
             title: '状态 / 打印',
+            width: '11%',
             render: (_, t) => (
               <>
                 <Tag
@@ -318,10 +323,10 @@ export function TubesPanel({
           },
           {
             title: '操作',
-            fixed: 'right',
+            width: '18%',
             render: (_, t) => (
-              <Space direction="vertical">
-                <Button onClick={() => setDetail(t)}>详情 {t.id}</Button>
+              <Space wrap className="tube-row-actions">
+                <Button size="small" aria-label={`详情 ${t.id}`} onClick={() => setDetail(t)}>详情</Button>
                 <Button
                   aria-label={`更正 ${t.id}`}
                   disabled={blocked || t.status === 'VOID'}

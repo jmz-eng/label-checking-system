@@ -25,9 +25,15 @@ import { ScanPanel } from './ScanPanel';
 import { RecordsPanel } from './RecordsPanel';
 import { WorkspaceNavigation, workspaceViews } from './WorkspaceNavigation';
 import { WorkspaceOverview } from './WorkspaceOverview';
+import { ExperimentLifecycleDialog } from './ExperimentLifecycleDialog';
 import { CommandFeedback, errorText, NativeSelect, useCommand } from './shared';
 export function ExperimentsPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isAdmin = !!user?.roles.includes('ADMIN');
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [lifecycleTarget, setLifecycleTarget] = useState<Experiment | null>(null);
+  const loadRequest = useRef(0);
+  const invalidateLoad = useCallback(() => { ++loadRequest.current; }, []);
   const [params, setParams] = useSearchParams();
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [search, setSearch] = useState('');
@@ -40,16 +46,18 @@ export function ExperimentsPage() {
   const matchingExperiments = experiments.filter((e) => searchText(`${e.projectCode} ${e.projectName}`).includes(searchText(search)));
   const select = (id: number, tab = 'overview') => setParams({ experiment: String(id), tab });
   const load = useCallback(async () => {
+    const request = ++loadRequest.current;
     setLoading(true);
     setError('');
     try {
-      setExperiments(await experimentApi.list());
+      const rows = await experimentApi.list(showDeleted && isAdmin);
+      if (request === loadRequest.current) setExperiments(rows);
     } catch (e) {
-      setError(errorText(e));
+      if (request === loadRequest.current) setError(errorText(e));
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current) setLoading(false);
     }
-  }, []);
+  }, [showDeleted, isAdmin]);
   useEffect(() => {
     void load();
     let active = true;
@@ -61,8 +69,9 @@ export function ExperimentsPage() {
       .catch(() => {});
     return () => {
       active = false;
+      invalidateLoad();
     };
-  }, [load]);
+  }, [load, invalidateLoad]);
   const command = useCommand<Experiment>(
     async (created) => {
       setCreating(false);
@@ -72,6 +81,12 @@ export function ExperimentsPage() {
     undefined,
     'create',
   );
+  const lifecycle = useCommand<Experiment>(async (saved) => {
+    setLifecycleTarget(null);
+    setExperiments((rows) => rows.filter((row) => row.id !== saved.id));
+    setParams({});
+    await load();
+  }, undefined, 'project-lifecycle');
   async function create() {
     const values = await form.validateFields().catch(() => null);
     if (!values) return;
@@ -81,8 +96,8 @@ export function ExperimentsPage() {
     <Space direction="vertical" className="page-stack experiment-page" size="middle">
       <header className="workspace-page-header">
         <div className="experiment-page-title">
-          <Typography.Title level={2}>{experiment ? '实验工作台' : '实验列表'}</Typography.Title>
-          <Button
+          <Typography.Title level={experiment ? 3 : 2}>{experiment ? `${experiment.projectCode} · ${experiment.projectName}` : showDeleted ? '已删除实验' : '实验列表'}</Typography.Title>
+          {!experiment && <Button
             disabled={!hasPermission('project:create') || command.busy || !!command.pending}
             title={!hasPermission('project:create') ? '当前账号没有添加实验权限' : undefined}
             onClick={() => {
@@ -91,12 +106,16 @@ export function ExperimentsPage() {
             }}
           >
             添加实验
-          </Button>
+          </Button>}
         </div>
         {experiment ? (
           <Button onClick={() => setParams({})}>返回实验列表</Button>
         ) : (
           <Space wrap>
+          {isAdmin && <Button disabled={lifecycle.busy || !!lifecycle.pending}
+            onClick={() => { setExperiments([]); setShowDeleted(!showDeleted); setParams({}); }}>
+            {showDeleted ? '正常实验' : '已删除实验'}
+          </Button>}
           <Input.Search
             aria-label="查找实验"
             placeholder="按课题号或实验名称查找"
@@ -116,7 +135,7 @@ export function ExperimentsPage() {
           placeholder="选择要操作的实验"
         />
           <span>匹配 {matchingExperiments.length} 个实验</span>
-          </Space>
+        </Space>
         )}
       </header>
       {error && (
@@ -127,6 +146,7 @@ export function ExperimentsPage() {
         />
       )}
       <CommandFeedback command={command} allowed={hasPermission('project:create')} />
+      {!lifecycleTarget && <CommandFeedback command={lifecycle} allowed={isAdmin} />}
       {current?.state === 'FAILED' && (
         <Alert
           type="error"
@@ -155,6 +175,7 @@ export function ExperimentsPage() {
             select(session.projectId, session.stage === 'COLLECTION' ? 'collection' : 'aliquot')
           }
           current={current}
+          readOnly={experiment.status === 'DELETED'}
         />
       ) : (
         <Table
@@ -169,11 +190,26 @@ export function ExperimentsPage() {
             { title: '实验名称', dataIndex: 'projectName' },
             {
               title: '操作',
-              render: (_, e) => <Button onClick={() => select(e.id)}>进入实验</Button>,
+              render: (_, e: Experiment) => <Space wrap>
+                {e.status === 'DELETED' ? <>
+                  <Button onClick={() => select(e.id, 'records')}>核对记录</Button>
+                  <Button onClick={() => select(e.id, 'changes')}>更改记录</Button>
+                </> : <Button onClick={() => select(e.id)}>进入实验</Button>}
+                {isAdmin && <Button danger={e.status !== 'DELETED'} disabled={lifecycle.busy || !!lifecycle.pending}
+                  onClick={() => setLifecycleTarget(e)}>
+                  {e.status === 'DELETED' ? '恢复实验' : '删除实验'}
+                </Button>}
+              </Space>,
             },
           ]}
         />
       )}
+      {lifecycleTarget && <ExperimentLifecycleDialog key={lifecycleTarget.id}
+        experiment={lifecycleTarget} restore={lifecycleTarget.status === 'DELETED'}
+        blocked={lifecycle.busy || !!lifecycle.pending}
+        feedback={<CommandFeedback command={lifecycle} allowed={isAdmin} />}
+        onCancel={() => { if (!lifecycle.busy && !lifecycle.pending) setLifecycleTarget(null); }}
+        onConfirm={(reason) => { if (isAdmin) void lifecycle.execute(`/api/experiments/${lifecycleTarget.id}/${lifecycleTarget.status === 'DELETED' ? 'restore' : 'delete'}`, { reason, confirmed: true }); }} />}
       <Modal
         title="添加实验"
         open={creating}
@@ -219,6 +255,7 @@ function Workspace({
   onSession,
   onReturn,
   current,
+  readOnly = false,
 }: {
   experiment: Experiment;
   tab: string;
@@ -226,6 +263,7 @@ function Workspace({
   onSession: (session: Session) => void;
   onReturn: (session: Session) => void;
   current: Session | null;
+  readOnly?: boolean;
 }) {
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [purposes, setPurposes] = useState<Purpose[]>([]);
@@ -235,7 +273,10 @@ function Workspace({
   const [ready, setReady] = useState(false);
   const sequence = useRef(0);
   const alive = useRef(true);
+  const activeTab = readOnly ? (tab === 'changes' ? 'changes' : 'records')
+    : workspaceViews.some((view) => view.key === tab) ? tab : 'overview';
   const refresh = useCallback(async () => {
+    if (!alive.current) return;
     const request = ++sequence.current;
     setLoading(true);
     setError('');
@@ -269,20 +310,14 @@ function Workspace({
     return () => {
       alive.current = false;
     };
-  }, [refresh]);
-  const activeTab = workspaceViews.some((view) => view.key === tab) ? tab : 'overview';
+  }, [refresh, activeTab]);
   const props = { projectId: experiment.id, purposes, tubes, refresh };
   return (
     <div className="experiment-workspace">
-      <div className="workspace-trial-heading">
-        <span className="workspace-eyebrow">当前实验</span>
-        <Typography.Title level={3}>
-          {experiment.projectCode} · {experiment.projectName}
-        </Typography.Title>
-      </div>
       <div className="workspace-layout">
-        <WorkspaceNavigation active={activeTab} onNavigate={onTab} />
+        <WorkspaceNavigation active={activeTab} onNavigate={onTab} readOnly={readOnly} />
         <section className="workspace-main" aria-label="当前实验工作区">
+          {readOnly && <Alert type="warning" message="实验已删除，仅可查看追溯记录；需管理员恢复后才能继续操作。" />}
           {error && (
             <Alert
               type="error"

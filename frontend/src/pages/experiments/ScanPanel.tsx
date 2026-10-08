@@ -167,8 +167,8 @@ export function ScanPanel({
       t.confirmed &&
       purposes.some((p) => p.id === t.purposeId && p.active && p.confirmed),
   );
-  const dates = [...new Set(validTubes.map((t) => t.collectDate))].sort();
-  const times = [...new Set(validTubes.map((t) => t.timePoint))].sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true }));
+  const dates = [...new Set(validTubes.map((t) => t.collectDate))];
+  const times = [...new Set(validTubes.map((t) => t.timePoint))];
   const timeDates = (time: string) => dates.filter((date) => validTubes.some((t) => t.collectDate === date && t.timePoint === time));
   function chooseDate(date: string) {
     setCollectDate(date);
@@ -261,21 +261,13 @@ export function ScanPanel({
           ? session.lastResult
           : undefined;
   return (
-    <Space direction="vertical" className="page-stack workspace-scan-panel" size="middle">
+    <Space direction="vertical" className="page-stack workspace-scan-panel" size={10}>
       <div className="workspace-scan-heading">
         <span className="workspace-eyebrow">现场核对</span>
         <Typography.Title level={4}>
           {stage === 'COLLECTION' ? '采血核对' : '血样处理核对'}
         </Typography.Title>
       </div>
-      <Alert
-        type="info"
-        message={
-          stage === 'COLLECTION'
-            ? '选定采样条件后先扫描动物芯片，再扫描采血管。每次换动物都要重新扫描芯片。'
-            : '采样日期是原始采血日期。先扫具体来源采血管，该管已有采血通过记录才能继续扫分装管。'
-        }
-      />
       {!permitted && <Alert type="warning" message="当前账号没有此核对阶段的操作权限" />}
       {restoreError && (
         <Alert
@@ -291,21 +283,6 @@ export function ScanPanel({
           action={<Button onClick={() => onReturn(session)}>返回当前核对</Button>}
         />
       )}
-      <Alert
-        type="info"
-        message={`本实验已识别 ${times.length} 个时间点（来自已确认有效管子的时间点列）`}
-        description={
-          <Space direction="vertical">
-            <span>时间点与采样日期对应；其他日期的时间点仍会显示，但须先切换到对应日期。</span>
-            {dates.map((date) => (
-              <Space wrap key={date}>
-                <span>{date}：{times.filter((time) => timeDates(time).includes(date)).join('、')}</span>
-                <Button disabled={blocked || lockContext} onClick={() => chooseDate(date)} aria-label={`选择日期 ${date}`}>选择该日期</Button>
-              </Space>
-            ))}
-          </Space>
-        }
-      />
       <Space wrap className="experiment-toolbar workspace-scan-conditions">
         <NativeSelect
           label="采样日期"
@@ -425,6 +402,31 @@ export function ScanPanel({
           </Checkbox>
         </Space>
       </div>
+      <details className="workspace-scan-help"><summary>操作说明与采样日期／时间点</summary>
+      <Alert
+        type="info"
+        message={
+          stage === 'COLLECTION'
+            ? '选定采样条件后先扫描动物芯片，再扫描采血管。每次换动物都要重新扫描芯片。'
+            : '采样日期是原始采血日期。先扫具体来源采血管，该管已有采血通过记录才能继续扫分装管。'
+        }
+      />
+      <Alert
+        type="info"
+        message={`本实验已识别 ${times.length} 个时间点（来自已确认有效管子的时间点列）`}
+        description={
+          <Space direction="vertical">
+            <span>时间点与采样日期对应；其他日期的时间点仍会显示，但须先切换到对应日期。</span>
+            {dates.map((date) => (
+              <Space wrap key={date}>
+                <span>{date}：{times.filter((time) => timeDates(time).includes(date)).join('、')}</span>
+                <Button disabled={blocked || lockContext} onClick={() => chooseDate(date)} aria-label={`选择日期 ${date}`}>选择该日期</Button>
+              </Space>
+            ))}
+          </Space>
+        }
+      />
+      </details>
       {matching && !reselecting && loaded && !command.pending && session.sourceSnapshot && (
         <div className="content-panel">
           <Typography.Title level={5}>当前来源采血管（本轮快照）</Typography.Title>

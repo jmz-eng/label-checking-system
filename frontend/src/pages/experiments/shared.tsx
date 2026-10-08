@@ -100,6 +100,7 @@ export function useCommand<T>(
   onReject?: (error: ApiError, path: string) => void | Promise<void>,
   durableKey?: string,
   retainOnSuccessFailure = false,
+  onDetachedSuccess?: (data: T) => void | Promise<void>,
 ) {
   const { user } = useAuth();
   const storageKey = durableKey ? `experiment-action:${user?.id}:${durableKey}` : undefined;
@@ -180,7 +181,17 @@ export function useCommand<T>(
         }
         return;
       }
-      if (!canSettle()) return;
+      if (!canSettle()) {
+        // A confirmed import may finish after its view was left. Its parent can
+        // refresh data without reviving this view or settling a pending retry.
+        // Scanner and printing deliberately do not supply this callback.
+        try {
+          await onDetachedSuccess?.(data);
+        } catch {
+          // The parent refresh owns its read error; preserve the original request.
+        }
+        return;
+      }
       try {
         await onSuccess(data, action.path, action.body);
         if (canSettle()) remember(null, persisted);

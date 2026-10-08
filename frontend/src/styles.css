@@ -896,6 +896,42 @@ body {
 .experiment-toolbar {
   margin: 14px 0;
 }
+.import-batch-panel { min-width: 0; }
+.import-batch-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.import-batch-heading { min-width: 0; }
+.import-batch-kind { color: #60718b; font-size: 12px; font-weight: 600; }
+.import-batch-heading h4 { margin: 5px 0 10px !important; font-size: 19px; line-height: 1.5; overflow-wrap: anywhere; }
+.import-batch-summary { display: flex; align-items: center; gap: 12px; color: #667085; font-size: 13px; }
+.import-batch-summary .ant-tag { margin: 0; }
+.import-batch-header > .ant-btn { flex: none; margin-top: 22px; }
+.import-batch-id { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 20px; color: #77849a; font-size: 12px; }
+.import-batch-id code { font-size: 12px; overflow-wrap: anywhere; }
+.import-batch-tools { margin: 0 0 20px; border: 1px solid #e1e7f0; border-radius: 10px; background: #f8faff; }
+.import-tool-section { padding: 16px 18px; min-width: 0; }
+.import-tool-section + .import-tool-section { border-top: 1px solid #e1e7f0; }
+.import-tool-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+.import-tool-heading strong { display: flex; align-items: center; gap: 8px; color: #344865; font-size: 14px; }
+.import-tool-heading strong > span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: #2459bf; background: #e7efff; font-size: 12px; }
+.import-selection-count { color: #2459bf; font-size: 13px; }
+.import-selection-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.import-selection-controls > .ant-input-search { width: 280px; max-width: 100%; }
+.import-tool-section > p { margin: 10px 0 0; color: #77849a; font-size: 12px; line-height: 1.6; }
+.import-bulk-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.import-bulk-controls .experiment-field { width: 210px; min-width: 0; }
+.import-bulk-controls .experiment-field:has(select[aria-label='批量来源采血管']) { flex: 1 1 280px; max-width: 420px; }
+.import-bulk-controls select { max-width: 100%; min-height: 38px; }
+.import-batch-tools .ant-btn { height: 38px; }
+.import-selection-controls .ant-input, .import-selection-controls .ant-input-search-button { height: 38px; }
+@media screen and (max-width: 760px) {
+  .import-batch-header { flex-direction: column; gap: 12px; }
+  .import-batch-header > .ant-btn { margin-top: 0; }
+  .import-batch-heading h4 { font-size: 17px; }
+  .import-tool-section { padding: 14px; }
+  .import-selection-controls > .ant-input-search { width: 100%; }
+  .import-bulk-controls { flex-direction: column; align-items: stretch; }
+  .import-bulk-controls .experiment-field { width: 100%; }
+  .import-bulk-controls .experiment-field:has(select[aria-label='批量来源采血管']) { flex: none; max-width: 100%; }
+}
 .experiment-context {
   padding: 10px 14px;
   background: #edf4ff;
@@ -1197,3 +1233,59 @@ body {
     height: 10mm;
   }
 }
+
+/* Full-width experiment workflow; management stays in the header. */
+.app-experiment-mode .app-main-layout { width: 100%; }
+.app-experiment-mode .app-content { padding: 18px clamp(16px, 2vw, 32px); }
+.app-experiment-mode .workspace-page-header { margin-bottom: 0; align-items: center; }
+.app-experiment-mode .workspace-page-header h3 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
+.workspace-layout { display: flex; flex-direction: column; gap: 14px; }
+.workspace-main { width: 100%; }
+.workspace-top-navigation { width: 100%; padding: 0; }
+.workspace-top-navigation .workspace-nav-groups { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.workspace-top-navigation section { display: flex; align-items: center; gap: 6px; }
+.workspace-top-navigation section + section { margin: 0; }
+.workspace-top-navigation .workspace-nav-groups button { width: auto; margin: 0; white-space: nowrap; }
+.workspace-top-navigation .workspace-primary-nav { margin-right: auto; }
+.workspace-top-navigation .workspace-primary-nav button { font-size: 14px; padding: 10px 16px; }
+.workspace-group-active { border-color: #91b5f2; color: #174fa4; background: #edf3ff; }
+.workspace-view > .workspace-scan-panel { max-width: 960px; margin: 0 auto; padding: 18px 24px; }
+.workspace-scan-heading { display: flex; align-items: baseline; gap: 10px; }
+.workspace-scan-heading h4 { margin: 0 !important; font-size: 20px; }
+.workspace-scan-panel .experiment-scan-state { padding: 12px 18px; }
+.workspace-scan-panel .experiment-scan-state p { margin: 4px 0 0; }
+.workspace-scan-panel .workspace-scanner { border: 2px solid #bdd1f4; padding: 18px 22px; background: #f5f9ff; }
+.workspace-scanner .ant-input { min-height: 56px; font-size: 22px; }
+.workspace-scan-help { font-size: 13px; color: #60718b; }
+.workspace-scan-help summary { cursor: pointer; padding: 8px 0; }
+.workspace-scan-help .ant-alert { margin-top: 8px; }
+.experiment-tube-filters { width: 100%; }
+.experiment-tube-filters > .ant-space-item:first-child { width: min(340px, 100%); }
+.experiment-tubes-table .ant-table-cell { padding: 12px 10px !important; white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.experiment-tubes-table .ant-table-cell .preserve-text { white-space: pre-wrap; }
+.experiment-tubes-table .ant-tag { white-space: normal; margin: 0; }
+.tube-row-actions { gap: 4px !important; }
+.tube-row-actions .ant-btn { padding: 0 7px; height: 28px; font-size: 12px; }
+@media screen and (max-width: 1000px) {
+  .workspace-top-navigation .workspace-nav-groups { display: none; }
+  .workspace-top-navigation.is-expanded .workspace-nav-groups { display: flex; }
+  .workspace-top-navigation .workspace-primary-nav { flex-wrap: wrap; width: 100%; }
+  .workspace-view > .workspace-scan-panel { padding: 14px; }
+  .experiment-tubes-table .ant-table-cell { padding: 9px 5px !important; font-size: 12px; }
+}
+@media screen and (max-width: 600px) {
+  .experiment-tubes-table .ant-table-thead { display: none; }
+  .experiment-tubes-table table, .experiment-tubes-table tbody, .experiment-tubes-table tr, .experiment-tubes-table td { display: block; width: 100% !important; }
+  .experiment-tubes-table .ant-table-row { border: 1px solid #dce4ef; border-radius: 10px; margin-bottom: 12px; padding: 10px; }
+  .experiment-tubes-table .ant-table-cell { border: 0 !important; padding: 5px !important; }
+  .experiment-tubes-table .ant-table-cell::before { display: inline-block; width: 82px; color: #75839a; }
+  .experiment-tubes-table td:nth-child(2)::before { content: '试验编号'; }
+  .experiment-tubes-table td:nth-child(3)::before { content: '动物号'; }
+  .experiment-tubes-table td:nth-child(4)::before { content: '时间点'; }
+  .experiment-tubes-table td:nth-child(5)::before { content: '管标信息'; }
+  .experiment-tubes-table td:nth-child(6)::before { content: '采样日期'; }
+  .experiment-tubes-table td:nth-child(7)::before { content: '用途 / 来源'; }
+  .experiment-tubes-table td:nth-child(8)::before { content: '状态 / 打印'; }
+}
+
+.workspace-scan-panel .experiment-scan-state { min-height: 64px; }

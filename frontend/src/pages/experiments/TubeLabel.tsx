@@ -26,6 +26,7 @@ export function TubeLabel({ tube }: { tube: Tube }) {
             <text
               key={i}
               x={layout.textX}
+              textAnchor="middle"
               y={line.y}
               fontSize={line.fontSize}
               fontWeight={line.bold ? 700 : 500}

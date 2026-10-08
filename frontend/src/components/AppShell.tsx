@@ -16,7 +16,7 @@ import {
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { Avatar, Button, Drawer, Layout, Menu, Space, Typography } from 'antd';
+import { Avatar, Button, Drawer, Dropdown, Layout, Menu, Space, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -89,6 +89,9 @@ export function AppShell() {
 
   const flatMenus = flattenMenus(menus);
   const selected = flatMenus.find((item) => item.routePath === location.pathname);
+  const experimentMode = selected?.component === 'ExperimentsPage';
+  const managementItems = flatMenus.filter(menu => menu.routePath && menu.component !== 'LAYOUT'
+    && menu.component !== 'ExperimentsPage' && !legacyPageComponents.has(menu.component || ''));
   const openKeys = flatMenus
     .filter((item) => item.children?.some((child) => child.menuKey === selected?.menuKey))
     .map((item) => item.menuKey);
@@ -107,8 +110,8 @@ export function AppShell() {
   };
 
   return (
-    <Layout className="app-shell">
-      <Sider width={232} className="app-sider">
+    <Layout className={`app-shell ${experimentMode ? 'app-experiment-mode' : ''}`}>
+      {!experimentMode && <Sider width={232} className="app-sider">
         <div className="brand">
           <div className="brand-mark">
             <img src="/favicon.svg" alt="" aria-hidden="true" />
@@ -126,16 +129,16 @@ export function AppShell() {
           onClick={handleMenuClick}
           className="side-menu"
         />
-      </Sider>
+      </Sider>}
       <Layout className="app-main-layout">
         <Header className="app-header">
           <div className="app-header-inner">
-            <Button
+            {!experimentMode && <Button
               className="mobile-menu-toggle"
               aria-label="打开导航"
               icon={<MenuOutlined />}
               onClick={() => setMobileMenu(true)}
-            />
+            />}
             <div className="app-title-block">
               <Typography.Title level={4} className="page-title">
                 标签核对系统
@@ -143,6 +146,10 @@ export function AppShell() {
               <Typography.Text type="secondary">标签条码化、扫码核对、自动留痕</Typography.Text>
             </div>
             <Space size={14} className="header-actions">
+              {experimentMode && !!managementItems.length && <Dropdown trigger={['click']} menu={{
+                items: managementItems.map(item => ({key:item.menuKey,label:item.menuName})),
+                onClick:handleMenuClick,
+              }}><Button icon={<SettingOutlined />}>系统管理</Button></Dropdown>}
               <Avatar>{user?.realName?.slice(0, 1) ?? 'U'}</Avatar>
               <div className="user-info">
                 <Typography.Text strong>{user?.realName}</Typography.Text>
