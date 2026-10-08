@@ -311,7 +311,7 @@ test('移动端键盘选择导航后折叠菜单并恢复可见焦点', async ({
 
 test('选择实验默认回工作台，无核对权限入口禁用并说明原因', async ({ page }) => {
   await open(page, 'groups', undefined, ['project:view']);
-  await page.getByLabel('选择实验', { exact: true }).selectOption('');
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
   await page.getByRole('button', { name: '进入实验', exact: true }).click();
   await expect(page).toHaveURL(/tab=overview$/);
   await expect(page.getByRole('button', { name: '进入采血核对', exact: true })).toBeDisabled();
@@ -340,6 +340,7 @@ test('其他实验失败轮在首页保持醒目并返回原实验，入口不�
     if (path.endsWith('/sessions/current') || path.endsWith('/sessions/s1')) return { ...session, state: 'FAILED' };
     if (path.endsWith('/sessions') && method === 'POST') starts++;
   });
+  await page.getByRole('button', { name: '返回实验列表', exact: true }).click();
   await page.getByLabel('选择实验', { exact: true }).selectOption('8');
   await expect(page.getByText(/当前账号有未解决的失败核对：DEMO-001/)).toBeVisible();
   await page.getByRole('button', { name: '进入血样处理核对', exact: true }).click();
@@ -1812,15 +1813,20 @@ for (const tab of ['collection-tubes', 'aliquot-tubes', 'print']) {
   });
 }
 
-test('实验按课题号实时查找，进入后也能筛选切换实验', async ({ page }) => {
+test('实验列表实时查找，进入实验后隐藏查找及切换，返回列表可重新选择', async ({ page }) => {
   const experiments=[experiment,{...experiment,id:8,projectCode:'STUDY-XYZ',projectName:'另一个实验'}];
   await open(page,'overview',(path)=>path==='/api/experiments'?experiments:undefined);
-  await page.getByLabel('选择实验',{exact:true}).selectOption('');
+  await page.getByRole('button',{name:'返回实验列表',exact:true}).click();
   await page.getByRole('searchbox',{name:'查找实验',exact:true}).fill(' study-xy ');
   await expect(page.getByRole('table').locator('tbody tr.ant-table-row')).toHaveCount(1);
   await expect(page.getByRole('cell',{name:'STUDY-XYZ',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'进入实验',exact:true}).click();
   await expect(page.getByRole('heading',{name:'STUDY-XYZ · 另一个实验',exact:true})).toBeVisible();
+  await expect(page.getByRole('searchbox',{name:'查找实验',exact:true})).toHaveCount(0);
+  await expect(page.getByLabel('选择实验',{exact:true})).toHaveCount(0);
+  await expect(page.getByText(/匹配.*个实验/)).toHaveCount(0);
+  await page.getByRole('button',{name:'返回实验列表',exact:true}).click();
+  await expect(page.getByRole('searchbox',{name:'查找实验',exact:true})).toHaveValue(' study-xy ');
   await page.getByRole('searchbox',{name:'查找实验',exact:true}).fill('demo');
   await page.getByLabel('选择实验',{exact:true}).selectOption('7');
   await expect(page.getByRole('heading',{name:'DEMO-001 · 实验演示',exact:true})).toBeVisible();
