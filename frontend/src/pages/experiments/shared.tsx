@@ -2,6 +2,7 @@ import { Alert, Button, Descriptions, Space, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, http } from '../../api/http';
 import { useAuth } from '../../stores/AuthContext';
+import { createRequestId } from '../../utils/requestId';
 import type { Purpose, Tube } from '../../types/experiments';
 
 export function shanghaiTime(value?: string): string {
@@ -195,7 +196,7 @@ export function useCommand<T>(
       if (!pending)
         return perform({
           path,
-          body: { ...body, requestId: crypto.randomUUID() },
+          body: { ...body, requestId: createRequestId() },
         });
     },
     retry: () => (pending ? perform(pending) : undefined),

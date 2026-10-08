@@ -196,6 +196,58 @@ async function upload(page: Page) {
   });
 }
 
+test('HTTP环境没有randomUUID时可保存实验，刷新重试保留原请求编号', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, 'randomUUID', { value: undefined, configurable: true });
+  });
+  const bodies: Body[] = [];
+  const created = { ...experiment, id: 8, projectCode: 'HTTP-001', projectName: 'HTTP实验' };
+  let saved = false;
+  await open(page, 'overview', (path, body, method) => {
+    if (path !== '/api/experiments') return;
+    if (method === 'POST') {
+      bodies.push(body);
+      saved = true;
+      if (bodies.length === 1) return 'NETWORK';
+      return created;
+    }
+    return saved ? [created, experiment] : [experiment];
+  });
+  await page.getByRole('button', { name: '添加实验', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '添加实验' });
+  await dialog.getByLabel('试验编号', { exact: true }).fill('HTTP-001');
+  await dialog.getByLabel('实验名称', { exact: true }).fill('HTTP实验');
+  await dialog.getByRole('button', { name: '保存实验' }).click();
+  await expect(dialog.getByRole('button', { name: '重试原操作' })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '重试原操作' }).click();
+  await expect(page.getByRole('heading', { name: 'HTTP-001 · HTTP实验', exact: true })).toBeVisible();
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).toEqual(bodies[1]);
+  expect(bodies[0].requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  await expect(page.getByRole('button', { name: '添加实验', exact: true })).toBeEnabled();
+});
+
+test('HTTP环境没有randomUUID时附件可预览，重试使用同一请求编号', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, 'randomUUID', { value: undefined, configurable: true });
+  });
+  await open(page, 'imports');
+  const requestIds: string[] = [];
+  await page.route('**/api/experiments/7/imports/preview', async (route) => {
+    const multipart = route.request().postDataBuffer()?.toString('utf8') || '';
+    requestIds.push(multipart.match(/name="requestId"\r\n\r\n([^\r]+)/)?.[1] || '');
+    if (requestIds.length === 1) return route.abort('failed');
+    await route.fulfill({ json: { code: 200, data: batch } });
+  });
+  await upload(page);
+  await page.getByRole('button', { name: '重试原附件预览' }).click();
+  await expect(page.getByLabel('用途 Sheet1:2', { exact: true })).toHaveValue('p1');
+  expect(requestIds).toHaveLength(2);
+  expect(requestIds[0]).toBe(requestIds[1]);
+  expect(requestIds[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
 test('工作台首页默认突出两个核对入口，入口导航不创建会话', async ({ page }) => {
   let starts = 0;
   await open(page, '', (path, _body, method) => {

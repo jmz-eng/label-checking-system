@@ -4,6 +4,7 @@ import { experimentApi, experimentPath } from '../../api/experiments';
 import { ApiError, http } from '../../api/http';
 import { useAuth } from '../../stores/AuthContext';
 import { humanizeApiMessage } from '../../utils/apiMessage';
+import { createRequestId } from '../../utils/requestId';
 import type { ImportBatch, ImportKind, ImportRow, Purpose, Tube } from '../../types/experiments';
 import {
   CommandFeedback,
@@ -248,7 +249,7 @@ export function ImportsPanel({
                   setUploadError('附件不能超过 8 MB');
                   return;
                 }
-                const action = { file, kind, requestId: crypto.randomUUID() };
+                const action = { file, kind, requestId: createRequestId() };
                 uploadAction.current = action;
                 void preview(action);
               }
