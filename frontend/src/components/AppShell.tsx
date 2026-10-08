@@ -114,7 +114,7 @@ export function AppShell() {
             <img src="/favicon.svg" alt="" aria-hidden="true" />
           </div>
           <div>
-            <Typography.Text strong>标签防错工作台</Typography.Text>
+            <Typography.Text strong>标签核对系统</Typography.Text>
             <Typography.Text type="secondary">采血样品核对</Typography.Text>
           </div>
         </div>
@@ -138,7 +138,7 @@ export function AppShell() {
             />
             <div className="app-title-block">
               <Typography.Title level={4} className="page-title">
-                标签防错工作台
+                标签核对系统
               </Typography.Title>
               <Typography.Text type="secondary">标签条码化、扫码核对、自动留痕</Typography.Text>
             </div>
