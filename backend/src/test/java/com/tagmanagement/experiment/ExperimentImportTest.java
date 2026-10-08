@@ -40,6 +40,25 @@ class ExperimentImportTest extends ExperimentTestSupport {
     }
 
     @Test
+    void generalFifteenDigitNumericChipRetainsEveryDigit() throws Exception {
+        String p = project(), code = read("/" + p).path("projectCode").asText();
+        var preview =
+                upload(
+                        p,
+                        numericGroup(
+                                code,
+                                new double[][] {{1001, 812345678901234d}},
+                                new String[] {"General", "General"}),
+                        "GROUP");
+        assertEquals(0, preview.path("issues").size());
+        assertEquals("812345678901234", preview.path("rows").get(0).path("chipNo").asText());
+        call(
+                "/" + p + "/imports/" + preview.path("id").asText() + "/commit",
+                Map.of("confirmed", true));
+        assertEquals("812345678901234", read("/" + p + "/mappings").get(0).path("chipNo").asText());
+    }
+
+    @Test
     void numericPrecisionFractionAndScientificFormatsStillBlockGroupCommit() throws Exception {
         String p = project(), code = read("/" + p).path("projectCode").asText();
         for (var scenario :

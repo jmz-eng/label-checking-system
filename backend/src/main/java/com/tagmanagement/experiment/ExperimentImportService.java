@@ -299,6 +299,9 @@ public class ExperimentImportService {
                             .toUpperCase(Locale.ROOT)
                             .matches(".*E[+-]0+.*")) {
                 issue(issues, sheet, row, col, "标识数字可能丢失精度或前导零，请用文本保存");
+            } else if ("General".equalsIgnoreCase(cell.getCellStyle().getDataFormatString())) {
+                // General display can round long identifiers into scientific notation.
+                return java.math.BigDecimal.valueOf(n).toBigIntegerExact().toString();
             }
         }
         return new DataFormatter(Locale.ROOT).formatCellValue(cell);
