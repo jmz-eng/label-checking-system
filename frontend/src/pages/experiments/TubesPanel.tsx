@@ -169,16 +169,19 @@ export function TubesPanel({
         type="info"
         message="每支管有独立标签码。内容更正或替换会生成新身份并作废旧码；补打同一支管请在标签打印页选择原管，保持原标签码。采样日期始终是原始采血日期。"
       />
-      <Space wrap className="experiment-tube-filters">
-        <Input.Search
-          aria-label="查找管子"
-          placeholder="动物、时间点、原始管标、日期或标签码"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          onSearch={setSearch}
-          allowClear
-          style={{ width: '100%' }}
-        />
+      <div className="experiment-tube-filters experiment-filter-bar">
+        <label className="experiment-field">
+          <span>查找管子</span>
+          <Input.Search
+            aria-label="查找管子"
+            placeholder="动物、时间点、原始管标、日期或标签码"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onSearch={setSearch}
+            allowClear
+            style={{ width: '100%' }}
+          />
+        </label>
         <NativeSelect
           label="管子状态"
           value={status}
@@ -189,52 +192,58 @@ export function TubesPanel({
           ]}
           placeholder="全部状态"
         />
-      </Space>
+      </div>
       <CommandFeedback command={command} allowed={hasPermission('sample:generate')} />
       {saved && <Alert type="success" message={saved} />}{' '}
       {validation && !editing && !voiding && <Alert type="error" message={validation} />}
-      <Space wrap className="experiment-toolbar">
-        <span>已选 {selected.length} 支（最多1000）</span>
-        <Button disabled={blocked || !selectable.length} onClick={() => setSelected(selectable.slice(0, 1000).map((t) => t.id))}>
-          全选筛选结果（最多1000支）
-        </Button>
-        <Button disabled={blocked || !selected.length} onClick={() => setSelected([])}>
-          清空选择
-        </Button>
-        <NativeSelect
-          label="批量用途"
-          value={purposeId}
-          onChange={(v) => {
-            setPurposeId(v);
-            setSourceId('');
-          }}
-          options={purposeOptions(purposes)}
-          disabled={blocked}
-        />
-        {kind === 'ALIQUOT' && (
+      <section className="experiment-bulk-panel" aria-label="管子批量操作">
+        <div className="experiment-selection-actions">
+          <span className="experiment-selection-count">已选 {selected.length} 支（最多1000）</span>
+          <Button disabled={blocked || !selectable.length} onClick={() => setSelected(selectable.slice(0, 1000).map((t) => t.id))}>
+            全选筛选结果（最多1000支）
+          </Button>
+          <Button disabled={blocked || !selected.length} onClick={() => setSelected([])}>
+            清空选择
+          </Button>
+        </div>
+        <div className="experiment-bulk-fields">
           <NativeSelect
-            label="批量来源采血管"
-            value={sourceId}
-            onChange={setSourceId}
-            options={sources.map((t) => ({
-              value: t.id,
-              label: `${t.animalNo} · ${t.collectDate} · ${t.timePoint} · ${t.id}`,
-            }))}
+            label="批量用途"
+            value={purposeId}
+            onChange={(v) => {
+              setPurposeId(v);
+              setSourceId('');
+            }}
+            options={purposeOptions(purposes)}
             disabled={blocked}
           />
-        )}
-        <Input
-          aria-label="批量更正原因"
-          placeholder="批量更正原因"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          disabled={blocked}
-          style={{ width: 220 }}
-        />
-        <Button disabled={blocked || !selected.length || selected.length > 1000} onClick={assign}>
-          确认批量归类与配对
-        </Button>
-      </Space>
+          {kind === 'ALIQUOT' && (
+            <NativeSelect
+              label="批量来源采血管"
+              value={sourceId}
+              onChange={setSourceId}
+              options={sources.map((t) => ({
+                value: t.id,
+                label: `${t.animalNo} · ${t.collectDate} · ${t.timePoint} · ${t.id}`,
+              }))}
+              disabled={blocked}
+            />
+          )}
+          <label className="experiment-field experiment-reason-field">
+            <span>批量更正原因</span>
+            <Input
+              aria-label="批量更正原因"
+              placeholder="批量更正原因"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              disabled={blocked}
+            />
+          </label>
+          <Button type="primary" disabled={blocked || !selected.length || selected.length > 1000} onClick={assign}>
+            确认批量归类与配对
+          </Button>
+        </div>
+      </section>
       <Table
         rowKey="id"
         dataSource={rows}

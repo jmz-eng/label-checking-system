@@ -1,0 +1,239 @@
+/* Screen presentation only. Printed labels keep their calibrated artwork. */
+@media screen {
+  .refined-login,
+  .app-experiment-mode {
+    --surface-border: #e5eaf2;
+    --text-muted: #738096;
+    --surface-shadow: 0 4px 20px rgb(35 55 89 / 3%);
+  }
+
+  .refined-login {
+    padding: 24px;
+    background: #f3f6fb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  }
+
+  .login-layout {
+    display: grid;
+    grid-template-columns: 1.08fr 1fr;
+    width: min(1100px, 100%);
+    min-height: 610px;
+    overflow: hidden;
+    border: 1px solid var(--surface-border);
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: 0 18px 70px rgb(32 60 110 / 7%);
+  }
+
+  .login-story {
+    display: flex;
+    flex-direction: column;
+    padding: 36px 44px 28px;
+    background: linear-gradient(145deg, #edf4ff, #f6f9ff);
+    border-right: 1px solid #e7eef9;
+  }
+
+  .login-product-brand,
+  .app-product-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .login-product-brand {
+    color: #203858;
+    font-size: 19px;
+    font-weight: 650;
+  }
+
+  .login-product-brand .brand-mark,
+  .app-product-brand .brand-mark {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+  }
+
+  .login-story-content { margin: auto 0; padding: 24px 0; }
+  .login-eyebrow { color: #486d9f; font-size: 13px; font-weight: 500; }
+  .login-story h1 { margin: 14px 0 16px; color: #203858; font-size: clamp(28px, 3vw, 38px); line-height: 1.45; letter-spacing: .02em; }
+  .login-story p { margin: 0; color: #70829c; font-size: 14px; line-height: 1.9; }
+  .login-workflow { display: grid; gap: 12px; margin: 30px 0 0; padding: 0; list-style: none; }
+  .login-workflow li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid #e4ecf9; border-radius: 12px; background: rgb(255 255 255 / 80%); }
+  .login-workflow-icon { display: grid; flex: none; place-items: center; width: 38px; height: 38px; color: #3b6db9; background: #eef4ff; border-radius: 10px; font-size: 20px; }
+  .login-workflow li > div { display: grid; gap: 4px; min-width: 0; }
+  .login-workflow strong { color: #344b6a; font-size: 14px; font-weight: 600; }
+  .login-workflow li > div > span { color: #7a8ba2; font-size: 12px; }
+  .login-step-number { margin-left: auto; color: #a9bbd4; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .login-story-footer { color: #8798ae; font-size: 12px; }
+
+  .login-form-panel { align-self: center; min-width: 0; padding: 52px clamp(32px, 5vw, 64px); }
+  .login-form-heading { margin-bottom: 34px; }
+  .login-form-heading h2 { margin: 0 0 10px; color: #23354f; font-size: 28px; font-weight: 650; }
+  .login-form-heading > span.ant-typography { font-size: 13px; }
+  .login-form-panel .ant-form-item { margin-bottom: 24px; }
+  .login-form-panel .ant-form-item-label { padding-bottom: 8px; }
+  .login-form-panel .ant-form-item-label > label { color: #536077; font-size: 13px; }
+  .login-form-panel .ant-input-affix-wrapper { min-height: 46px; padding: 9px 14px; border-color: #dfe6ef; border-radius: 9px; background: #fcfdff; }
+  .login-form-panel .ant-input-prefix { margin-right: 10px; color: #8c9ab0; }
+  .login-form-panel .ant-input { background: transparent; font-size: 14px; }
+  .login-form-panel .ant-btn { height: 46px; margin-top: 6px; border-radius: 9px; font-size: 15px; font-weight: 500; box-shadow: 0 4px 10px rgb(23 87 194 / 12%); }
+  .login-form-panel .login-hint { margin-top: 26px; color: #8a96a8; text-align: center; font-size: 12px; }
+  .login-form-panel :is(input, button):focus-visible { outline: 3px solid #80aaf0; outline-offset: 3px; }
+
+  .app-experiment-mode { background: #f5f7fb; }
+  .app-experiment-mode .app-header { border-color: var(--surface-border); }
+  .app-experiment-mode .app-header-inner { max-width: 1600px; }
+  .app-experiment-mode .app-product-brand .page-title { color: #263b59; font-size: 18px; }
+  .app-experiment-mode .app-title-block > .ant-typography:last-child { color: #8994a6; font-size: 12px; }
+  .app-experiment-mode .header-actions .ant-avatar { color: #3762a1; background: #eaf1fc; }
+  .app-experiment-mode .user-info { gap: 3px; font-size: 13px; }
+  .app-experiment-mode .user-info .ant-typography-secondary { font-size: 12px; }
+  .app-experiment-mode .app-content { overflow: visible; background: #f5f7fb; padding-top: 24px; padding-bottom: 32px; }
+  .app-experiment-mode .app-content-inner { max-width: 1536px; }
+  .experiment-selection-page { max-width: 1320px; margin: 4px auto 0; }
+  .experiment-selection-page .workspace-page-header { padding: 4px 0 10px; }
+  .experiment-selection-page .workspace-page-header h2 { color: #263b59; font-size: 27px; }
+  .experiment-selection-page .workspace-page-header > .ant-btn { height: 40px; padding-inline: 18px; border-radius: 8px; }
+  .experiment-page-description { margin: 9px 0 0; color: var(--text-muted); font-size: 13px; line-height: 1.7; }
+  .experiment-list-card { overflow: hidden; border: 1px solid var(--surface-border); border-radius: 14px; background: #fff; box-shadow: var(--surface-shadow); }
+  .experiment-list-tools { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr) auto; align-items: end; gap: 20px; padding: 22px 24px; }
+  .experiment-list-tools .experiment-field { min-width: 0; }
+  .experiment-list-tools .experiment-field select { max-width: 100%; }
+  .experiment-list-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-top: 1px solid #eff2f7; }
+  .experiment-list-summary strong { color: #45556e; font-size: 14px; font-weight: 600; }
+  .experiment-list-summary > span { color: var(--text-muted); font-size: 12px; }
+  .experiment-list-table .ant-table-cell { padding: 17px 24px !important; overflow-wrap: anywhere; }
+  .experiment-list-table .ant-table-pagination { padding: 0 24px; }
+  .experiment-project-code { display: flex; align-items: baseline; gap: 10px; color: #34527a; font-weight: 600; }
+  .experiment-project-code .anticon { flex: none; color: #94aac8; }
+  .experiment-list-actions { gap: 8px !important; }
+  .experiment-list-actions .ant-btn { padding-inline: 6px; font-size: 13px; }
+
+  .experiment-page .ant-table-thead > tr > th { color: #6a7890; background: #f7f9fc; border-bottom-color: #e9eef5; font-size: 12px; font-weight: 500; }
+  .experiment-page .ant-table-thead > tr > th::before { display: none !important; }
+  .experiment-page .ant-table-tbody > tr > td { border-bottom-color: #edf1f6; }
+  .experiment-page .ant-table-tbody > tr:last-child > td { border-bottom-color: transparent; }
+  .experiment-page .ant-table-tbody > tr.ant-table-row:hover > td { background: #f8fbff; }
+  .experiment-page .ant-pagination { align-items: center; row-gap: 10px; }
+  .experiment-page .ant-pagination-total-text { margin-right: auto; color: #7b879b; font-size: 12px; }
+  .experiment-page .ant-btn { border-radius: 7px; }
+  .experiment-page .ant-alert { border-radius: 9px; }
+  .experiment-page .ant-alert-info { border-color: #dde8fa; background: #f4f8ff; }
+  .experiment-page .experiment-field > span { color: #66758b; font-size: 12px; line-height: 18px; }
+  .experiment-page .experiment-field select { height: 38px; min-height: 38px; border-color: #dfe5ee; border-radius: 7px; padding-inline: 10px; font-size: 13px; }
+  .experiment-page .experiment-field select:not(:disabled):hover { border-color: #7fa5e3; }
+  .experiment-page .experiment-field > .ant-input { height: 38px; border-color: #dfe5ee; border-radius: 7px; }
+  .experiment-page .experiment-field .ant-input-search :is(.ant-input, .ant-input-search-button, .ant-input-affix-wrapper) { height: 38px; }
+  .experiment-page .experiment-field .ant-input-search .ant-input-affix-wrapper .ant-input { height: auto; }
+  .experiment-page .experiment-field .ant-input-search .ant-input-search-button { border-start-start-radius: 0; border-end-start-radius: 0; }
+  .experiment-list-mode { height: 38px; }
+
+  .workspace-top-navigation { padding: 8px; border: 1px solid var(--surface-border); border-radius: 12px; background: #fff; box-shadow: var(--surface-shadow); }
+  .workspace-top-navigation .workspace-nav-groups { padding: 0; margin: 0; border: 0; background: transparent; }
+  .workspace-top-navigation .workspace-primary-nav button { border-radius: 8px; }
+  .workspace-top-navigation .workspace-nav-groups button:hover { background: #f2f6fc; }
+  .workspace-top-navigation .workspace-nav-groups button[aria-current='page'] { color: #1757c2; background: #edf3ff; border-color: transparent; }
+  .workspace-top-navigation .workspace-nav-toggle { border: 0; padding: 8px; }
+  .workspace-view > .page-stack { border-color: var(--surface-border); border-radius: 14px; box-shadow: var(--surface-shadow); }
+  .workspace-view > .workspace-scan-panel { padding-top: 14px; }
+  .workspace-scan-panel .workspace-scan-conditions { margin-block: 0; }
+  .workspace-scan-panel .workspace-scanner { padding-top: 14px; }
+  .workspace-view > .page-stack > .ant-space-item > h4 { margin: 0; color: #344865; }
+  .experiment-section-title { min-height: 34px; }
+  .experiment-section-title h4 { color: #344865; font-size: 18px; }
+  .workspace-entry { box-shadow: var(--surface-shadow); }
+  .workspace-materials,
+  .workspace-secondary-grid > section { border-color: var(--surface-border); box-shadow: var(--surface-shadow); }
+
+  .experiment-filter-bar { display: grid; align-items: end; gap: 16px; padding: 16px; border: 1px solid #e9edf4; border-radius: 10px; background: #fafbfd; }
+  .experiment-tube-filters { grid-template-columns: minmax(0, 460px) minmax(160px, 220px); }
+  .experiment-tube-filters > .experiment-field { min-width: 0; }
+  .experiment-print-filters { grid-template-columns: minmax(150px, 190px) minmax(240px, 1fr) auto; }
+  .experiment-filter-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .experiment-filter-actions .ant-btn { height: 38px; }
+  .experiment-bulk-panel { padding: 16px; border: 1px solid #e9edf4; border-radius: 10px; background: #fafbfd; }
+  .experiment-selection-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid #e9edf4; }
+  .experiment-selection-count { margin-right: auto; color: #526a8d; font-size: 13px; }
+  .experiment-bulk-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding-top: 14px; }
+  .experiment-bulk-fields .experiment-field { flex: 1 1 180px; min-width: 0; max-width: 320px; }
+  .experiment-bulk-fields .experiment-reason-field { flex-basis: 220px; }
+  .experiment-bulk-fields .ant-btn { height: 38px; }
+  .experiment-import-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; padding: 18px; border: 1px solid #e9edf4; border-radius: 10px; background: #fafbfd; }
+  .experiment-import-controls > .ant-btn { height: 38px; }
+  .experiment-import-controls .experiment-upload { display: flex; flex-direction: column; gap: 6px; flex: 1 1 280px; min-width: 0; max-width: 480px; padding: 0; border: 0; color: #66758b; font-size: 12px; }
+  .experiment-import-controls input[type='file'] { width: 100%; height: 38px; border: 1px solid #dfe5ee; border-radius: 7px; padding: 5px; background: #fff; font: inherit; color: #738096; }
+  .experiment-import-controls input[type='file']::file-selector-button { margin-right: 10px; padding: 4px 10px; border: 0; border-radius: 4px; background: #edf3ff; color: #325e9d; font: inherit; cursor: pointer; }
+  .experiment-filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 18px; border: 1px solid #e9edf4; border-radius: 10px; background: #fafbfd; }
+  .experiment-filter-grid .experiment-field { min-width: 0; }
+  .experiment-filter-grid .experiment-field select { max-width: 100%; }
+}
+
+@media screen and (max-width: 1100px) {
+  .login-story { padding-inline: 30px; }
+  .login-form-panel { padding-inline: 36px; }
+  .experiment-print-filters { grid-template-columns: minmax(160px, 220px) minmax(0, 1fr); }
+  .experiment-filter-actions { grid-column: 1 / -1; }
+}
+
+@media screen and (max-width: 1000px) {
+  .workspace-top-navigation.is-expanded .workspace-nav-groups { padding-top: 10px; }
+}
+
+@media screen and (max-width: 920px) {
+  .app-experiment-mode .app-header-inner { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .app-experiment-mode .header-actions { width: auto; }
+  .experiment-list-tools { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .experiment-list-mode { grid-column: 1 / -1; justify-self: start; }
+}
+
+@media screen and (max-width: 760px) {
+  .refined-login { padding: 20px; }
+  .login-layout { display: block; max-width: 460px; min-height: 0; border-radius: 18px; }
+  .login-story { padding: 26px 28px 0; border: 0; background: #fff; }
+  .login-story-content,
+  .login-story-footer { display: none; }
+  .login-product-brand { font-size: 17px; }
+  .login-form-panel { padding: 32px 28px; }
+  .login-form-heading { margin-bottom: 28px; }
+  .login-form-heading h2 { font-size: 25px; }
+  .login-form-panel .login-hint { margin-top: 24px; }
+  .app-experiment-mode .app-content { padding: 18px 12px 24px; }
+  .experiment-selection-page .workspace-page-header { align-items: flex-start; flex-direction: row; gap: 12px; }
+  .experiment-selection-page .workspace-page-header h2 { font-size: 23px; }
+  .experiment-selection-page .workspace-page-header > .ant-btn { flex: none; height: 36px; padding-inline: 12px; }
+  .experiment-page-description { max-width: 340px; font-size: 12px; }
+  .experiment-list-tools { grid-template-columns: minmax(0, 1fr); padding: 18px; }
+  .experiment-list-summary { padding: 14px 18px; }
+  .experiment-list-table .ant-table-thead { display: none; }
+  .experiment-list-table :is(table, tbody, tr, td) { display: block; width: 100% !important; }
+  .experiment-list-table .ant-table-row { width: calc(100% - 28px) !important; margin: 0 14px 12px; padding: 14px; border: 1px solid #e8edf5; border-radius: 10px; }
+  .experiment-list-table .ant-table-cell { padding: 5px 0 !important; border: 0 !important; }
+  .experiment-list-table .ant-table-cell:nth-child(2) { padding-left: 24px !important; color: #738096; font-size: 13px; }
+  .experiment-list-table .ant-table-cell:last-child { padding-top: 10px !important; }
+  .experiment-list-table .ant-table-pagination { padding: 0 14px; }
+  .experiment-list-table .ant-pagination-total-text { flex-basis: 100%; }
+  .experiment-filter-bar { grid-template-columns: minmax(0, 1fr); padding: 14px; gap: 14px; }
+  .experiment-filter-bar .experiment-field { min-width: 0; }
+  .experiment-bulk-fields { align-items: stretch; flex-direction: column; }
+  .experiment-bulk-fields .experiment-field { flex: auto; max-width: 100%; }
+  .experiment-selection-count { flex-basis: 100%; margin-bottom: 4px; }
+  .experiment-selection-actions .ant-btn { max-width: 100%; font-size: 12px; }
+  .experiment-import-controls { align-items: stretch; flex-direction: column; padding: 14px; gap: 14px; }
+  .experiment-import-controls .experiment-upload { flex: auto; max-width: 100%; }
+  .experiment-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; gap: 12px; }
+}
+
+@media screen and (max-width: 640px) {
+  .app-experiment-mode .header-actions { width: 100%; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 8px !important; }
+  .app-experiment-mode .user-info { min-width: 0; }
+  .app-experiment-mode .header-actions > .ant-space-item:has(> .ant-avatar),
+  .app-experiment-mode .user-info .ant-typography-secondary { display: none; }
+  .app-experiment-mode .app-product-brand .brand-mark { width: 34px; height: 34px; }
+  .app-experiment-mode .app-product-brand .page-title { font-size: 17px; }
+  .experiment-list-table .ant-pagination { justify-content: center; }
+}
+
+@media screen and (max-width: 400px) {
+  .experiment-filter-grid { grid-template-columns: minmax(0, 1fr); }
+}

@@ -169,7 +169,7 @@ export function PrintPanel({
         message="25 × 10 mm；上方黑白条形码，下方完整五项原始字段（动物号与时间点合为一行）。300 dpi 使用两点码元和两侧各十模块白色留边。最小字号 16 打印点（约3.84磅），需用实际纸张、打印机和扫码设备确认可读性。过长标签逐支提示，不能裁切或无限缩小。"
       />
       {!allowed && <Alert type="warning" message="当前账号没有标签打印权限" />}
-      <Space wrap>
+      <div className="experiment-filter-bar experiment-print-filters">
         <NativeSelect
           label="打印管子类型"
           value={kind}
@@ -180,32 +180,36 @@ export function PrintPanel({
           ]}
           placeholder="全部管子"
         />
-        <Input.Search
-          aria-label="查找打印管子"
-          allowClear
-          placeholder="动物、时间点、管标、日期或短码"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          onSearch={setSearch}
-          style={{ width: 320 }}
-        />
-        <Button
-          disabled={busy}
-          onClick={() =>
-            select(
-              rows
-                .filter((t) => !ineligible(t))
-                .slice(0, 1000)
-                .map((t) => t.id),
-            )
-          }
-        >
-          全选筛选结果（最多1000支）
-        </Button>
-        <Button disabled={busy} onClick={() => select([])}>
-          清空选择
-        </Button>
-      </Space>
+        <label className="experiment-field">
+          <span>查找打印管子</span>
+          <Input.Search
+            aria-label="查找打印管子"
+            allowClear
+            placeholder="动物、时间点、管标、日期或短码"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onSearch={setSearch}
+          />
+        </label>
+        <div className="experiment-filter-actions">
+          <Button
+            disabled={busy}
+            onClick={() =>
+              select(
+                rows
+                  .filter((t) => !ineligible(t))
+                  .slice(0, 1000)
+                  .map((t) => t.id),
+              )
+            }
+          >
+            全选筛选结果（最多1000支）
+          </Button>
+          <Button disabled={busy} onClick={() => select([])}>
+            清空选择
+          </Button>
+        </div>
+      </div>
       <Table
         rowKey="id"
         dataSource={rows}

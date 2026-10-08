@@ -139,11 +139,14 @@ export function AppShell() {
               icon={<MenuOutlined />}
               onClick={() => setMobileMenu(true)}
             />}
-            <div className="app-title-block">
-              <Typography.Title level={4} className="page-title">
-                标签核对系统
-              </Typography.Title>
-              <Typography.Text type="secondary">标签条码化、扫码核对、自动留痕</Typography.Text>
+            <div className="app-product-brand">
+              {experimentMode && <div className="brand-mark"><img src="/favicon.svg" alt="" aria-hidden="true" /></div>}
+              <div className="app-title-block">
+                <Typography.Title level={4} className="page-title">
+                  标签核对系统
+                </Typography.Title>
+                <Typography.Text type="secondary">标签条码化、扫码核对、自动留痕</Typography.Text>
+              </div>
             </div>
             <Space size={14} className="header-actions">
               {experimentMode && !!managementItems.length && <Dropdown trigger={['click']} menu={{

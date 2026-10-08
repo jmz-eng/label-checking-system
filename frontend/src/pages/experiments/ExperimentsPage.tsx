@@ -1,4 +1,5 @@
 import { experimentPagination, searchText } from './shared';
+import { ArrowRightOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   Alert,
   Button,
@@ -93,49 +94,28 @@ export function ExperimentsPage() {
     void command.execute('/api/experiments', values);
   }
   return (
-    <Space direction="vertical" className="page-stack experiment-page" size="middle">
+    <Space direction="vertical" className={`page-stack experiment-page ${experiment ? '' : 'experiment-selection-page'}`} size="middle">
       <header className="workspace-page-header">
         <div className="experiment-page-title">
-          <Typography.Title level={experiment ? 3 : 2}>{experiment ? `${experiment.projectCode} · ${experiment.projectName}` : showDeleted ? '已删除实验' : '实验列表'}</Typography.Title>
-          {!experiment && <Button
-            disabled={!hasPermission('project:create') || command.busy || !!command.pending}
-            title={!hasPermission('project:create') ? '当前账号没有添加实验权限' : undefined}
-            onClick={() => {
-              setCreating(true);
-              form.resetFields();
-            }}
-          >
-            添加实验
-          </Button>}
+          <div>
+            <Typography.Title level={experiment ? 3 : 2}>{experiment ? `${experiment.projectCode} · ${experiment.projectName}` : showDeleted ? '已删除实验' : '实验列表'}</Typography.Title>
+            {!experiment && <p className="experiment-page-description">{showDeleted ? '查看历史记录，或恢复需要继续使用的实验。' : '选择要开展的实验，进入标签准备、扫码核对与记录追溯。'}</p>}
+          </div>
         </div>
-        {experiment ? (
+        {!experiment && <Button
+          type="primary"
+          icon={<PlusOutlined aria-hidden="true" />}
+          disabled={!hasPermission('project:create') || command.busy || !!command.pending}
+          title={!hasPermission('project:create') ? '当前账号没有添加实验权限' : undefined}
+          onClick={() => {
+            setCreating(true);
+            form.resetFields();
+          }}
+        >
+          添加实验
+        </Button>}
+        {experiment && (
           <Button onClick={() => setParams({})}>返回实验列表</Button>
-        ) : (
-          <Space wrap>
-          {isAdmin && <Button disabled={lifecycle.busy || !!lifecycle.pending}
-            onClick={() => { setExperiments([]); setShowDeleted(!showDeleted); setParams({}); }}>
-            {showDeleted ? '正常实验' : '已删除实验'}
-          </Button>}
-          <Input.Search
-            aria-label="查找实验"
-            placeholder="按课题号或实验名称查找"
-            allowClear
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            style={{ width: 280 }}
-          />
-        <NativeSelect
-          label="选择实验"
-          value=""
-          onChange={(value) => (value ? select(Number(value)) : setParams({}))}
-          options={matchingExperiments.map((e) => ({
-            value: String(e.id),
-            label: `${e.projectCode} · ${e.projectName}`,
-          }))}
-          placeholder="选择要操作的实验"
-        />
-          <span>匹配 {matchingExperiments.length} 个实验</span>
-        </Space>
         )}
       </header>
       {error && (
@@ -178,31 +158,63 @@ export function ExperimentsPage() {
           readOnly={experiment.status === 'DELETED'}
         />
       ) : (
-        <Table
-          pagination={{ ...experimentPagination }}
-          rowKey="id"
-          dataSource={matchingExperiments}
-          locale={{
-            emptyText: <Empty description={searchText(search) ? "未找到匹配实验，请调整课题号或名称" : "尚无实验，请添加实验后上传资料"} />,
-          }}
-          columns={[
-            { title: '试验编号', dataIndex: 'projectCode' },
-            { title: '实验名称', dataIndex: 'projectName' },
-            {
-              title: '操作',
-              render: (_, e: Experiment) => <Space wrap>
-                {e.status === 'DELETED' ? <>
-                  <Button onClick={() => select(e.id, 'records')}>核对记录</Button>
-                  <Button onClick={() => select(e.id, 'changes')}>更改记录</Button>
-                </> : <Button onClick={() => select(e.id)}>进入实验</Button>}
-                {isAdmin && <Button danger={e.status !== 'DELETED'} disabled={lifecycle.busy || !!lifecycle.pending}
-                  onClick={() => setLifecycleTarget(e)}>
-                  {e.status === 'DELETED' ? '恢复实验' : '删除实验'}
-                </Button>}
-              </Space>,
-            },
-          ]}
-        />
+        <section className="experiment-list-card" aria-label="实验选择">
+          <div className="experiment-list-tools">
+            <label className="experiment-field">
+              <span>查找实验</span>
+              <Input.Search
+                aria-label="查找实验"
+                placeholder="按课题号或实验名称查找"
+                allowClear
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <NativeSelect
+              label="选择实验"
+              value=""
+              onChange={(value) => (value ? select(Number(value)) : setParams({}))}
+              options={matchingExperiments.map((e) => ({
+                value: String(e.id),
+                label: `${e.projectCode} · ${e.projectName}`,
+              }))}
+              placeholder="选择要操作的实验"
+            />
+            {isAdmin && <Button className="experiment-list-mode" disabled={lifecycle.busy || !!lifecycle.pending}
+              onClick={() => { setExperiments([]); setShowDeleted(!showDeleted); setParams({}); }}>
+              {showDeleted ? '正常实验' : '已删除实验'}
+            </Button>}
+          </div>
+          <div className="experiment-list-summary"><strong>{showDeleted ? '已删除的实验' : '全部实验'}</strong><span>匹配 {matchingExperiments.length} 个实验</span></div>
+          <Table
+            className="experiment-list-table"
+            tableLayout="fixed"
+            pagination={{ ...experimentPagination }}
+            rowKey="id"
+            dataSource={matchingExperiments}
+            locale={{
+              emptyText: <Empty description={searchText(search) ? "未找到匹配实验，请调整课题号或名称" : "尚无实验，请添加实验后上传资料"} />,
+            }}
+            columns={[
+              { title: '试验编号', dataIndex: 'projectCode', width: '32%', render: (value: string) => <span className="experiment-project-code"><ExperimentOutlined aria-hidden="true" />{value}</span> },
+              { title: '实验名称', dataIndex: 'projectName', width: '40%' },
+              {
+                title: '操作',
+                width: '28%',
+                render: (_, e: Experiment) => <Space wrap className="experiment-list-actions">
+                  {e.status === 'DELETED' ? <>
+                    <Button type="link" onClick={() => select(e.id, 'records')}>核对记录</Button>
+                    <Button type="link" onClick={() => select(e.id, 'changes')}>更改记录</Button>
+                  </> : <Button type="link" onClick={() => select(e.id)}>进入实验<ArrowRightOutlined aria-hidden="true" /></Button>}
+                  {isAdmin && <Button type="text" danger={e.status !== 'DELETED'} disabled={lifecycle.busy || !!lifecycle.pending}
+                    onClick={() => setLifecycleTarget(e)}>
+                    {e.status === 'DELETED' ? '恢复实验' : '删除实验'}
+                  </Button>}
+                </Space>,
+              },
+            ]}
+          />
+        </section>
       )}
       {lifecycleTarget && <ExperimentLifecycleDialog key={lifecycleTarget.id}
         experiment={lifecycleTarget} restore={lifecycleTarget.status === 'DELETED'}

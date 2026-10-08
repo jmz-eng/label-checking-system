@@ -239,7 +239,7 @@ export function ImportsPanel({
       {kind === 'ALIQUOT' && !tubes.some((t) => t.kind === 'COLLECTION' && t.status === 'ACTIVE' && t.confirmed) && (
         <Alert type="warning" message="当前实验尚无已确认采血管，请先完成采血管表导入，再导入分装管表。" />
       )}
-      <Space wrap>
+      <div className="experiment-import-controls">
         <NativeSelect
           label="附件类型"
           value={kind}
@@ -282,7 +282,7 @@ export function ImportsPanel({
             }}
           />
         </label>
-      </Space>
+      </div>
       {uploadError && (
         <Alert
           type={uploadUnknown ? 'warning' : 'error'}
