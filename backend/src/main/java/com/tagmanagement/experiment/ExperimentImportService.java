@@ -297,7 +297,7 @@ public class ExperimentImportService {
                     || cell.getCellStyle()
                             .getDataFormatString()
                             .toUpperCase(Locale.ROOT)
-                            .contains("E")) {
+                            .matches(".*E[+-]0+.*")) {
                 issue(issues, sheet, row, col, "标识数字可能丢失精度或前导零，请用文本保存");
             }
         }

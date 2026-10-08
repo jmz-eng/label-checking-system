@@ -4,12 +4,118 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.util.*;
 
 class ExperimentImportTest extends ExperimentTestSupport {
+
+    @Test
+    void generalNumericAnimalAndFifteenDigitChipPreviewAndCommitExactly() throws Exception {
+        String p = project(), code = read("/" + p).path("projectCode").asText();
+        byte[] bytes =
+                numericGroup(
+                        code,
+                        new double[][] {{1001, 812345678901234d}, {1002, 812345678901235d}},
+                        new String[] {"General", "0_ "});
+        var preview = upload(p, bytes, "GROUP");
+        assertEquals(0, preview.path("issues").size(), preview.path("issues").toString());
+        assertEquals("PREVIEW", preview.path("status").asText());
+        assertEquals("1001", preview.path("rows").get(0).path("animalNo").asText());
+        assertEquals("812345678901234", preview.path("rows").get(0).path("chipNo").asText());
+        assertEquals(
+                "COMMITTED",
+                call(
+                                "/" + p + "/imports/" + preview.path("id").asText() + "/commit",
+                                Map.of("confirmed", true))
+                        .path("status")
+                        .asText());
+        var mappings = read("/" + p + "/mappings");
+        assertEquals(2, mappings.size());
+        assertTrue(mappings.findValuesAsText("animalNo").contains("1001"));
+        assertTrue(mappings.findValuesAsText("chipNo").contains("812345678901234"));
+    }
+
+    @Test
+    void numericPrecisionFractionAndScientificFormatsStillBlockGroupCommit() throws Exception {
+        String p = project(), code = read("/" + p).path("projectCode").asText();
+        for (var scenario :
+                List.of(
+                        new Object[] {1e15, "0"},
+                        new Object[] {123.5, "0.0"},
+                        new Object[] {12345d, "0.00E+00"},
+                        new Object[] {12345d, "0.00E-00"})) {
+            byte[] bytes =
+                    numericGroup(
+                            code,
+                            new double[][] {{1001, (double) scenario[0]}},
+                            new String[] {"0", (String) scenario[1]});
+            var preview = upload(p, bytes, "GROUP");
+            assertEquals("INVALID", preview.path("status").asText());
+            assertTrue(preview.path("issues").findValuesAsText("column").contains("芯片号"));
+            mvc.perform(
+                            post(
+                                            "/api/experiments/"
+                                                    + p
+                                                    + "/imports/"
+                                                    + preview.path("id").asText()
+                                                    + "/commit")
+                                    .header("Authorization", "Bearer " + token)
+                                    .contentType("application/json")
+                                    .content(
+                                            json.writeValueAsBytes(
+                                                    Map.of(
+                                                            "requestId",
+                                                            UUID.randomUUID().toString(),
+                                                            "confirmed",
+                                                            true))))
+                    .andExpect(status().isBadRequest());
+        }
+        assertEquals(0, read("/" + p + "/mappings").size());
+    }
+
+    @Test
+    void numericIdentifierExplicitLeadingZerosArePreserved() throws Exception {
+        String p = project(), code = read("/" + p).path("projectCode").asText();
+        var preview =
+                upload(
+                        p,
+                        numericGroup(
+                                code,
+                                new double[][] {{1, 12345}},
+                                new String[] {"0000", "000000000000000"}),
+                        "GROUP");
+        assertEquals(0, preview.path("issues").size());
+        assertEquals("0001", preview.path("rows").get(0).path("animalNo").asText());
+        assertEquals("000000000012345", preview.path("rows").get(0).path("chipNo").asText());
+    }
+
+    private byte[] numericGroup(String code, double[][] values, String[] formats)
+            throws Exception {
+        try (var book = new XSSFWorkbook(); var out = new ByteArrayOutputStream()) {
+            var sheet = book.createSheet("导入模板");
+            var header = sheet.createRow(0);
+            String[] names = {"试验编号", "动物号", "芯片号"};
+            for (int col = 0; col < names.length; col++)
+                header.createCell(col).setCellValue(names[col]);
+            for (int i = 0; i < values.length; i++) {
+                var row = sheet.createRow(i + 1);
+                row.createCell(0).setCellValue(code);
+                for (int col = 0; col < 2; col++) {
+                    var cell = row.createCell(col + 1);
+                    cell.setCellValue(values[i][col]);
+                    var style = book.createCellStyle();
+                    style.setDataFormat(book.createDataFormat().getFormat(formats[col]));
+                    cell.setCellStyle(style);
+                }
+            }
+            book.write(out);
+            return out.toByteArray();
+        }
+    }
 
     @Test
     void realExcelGroupPreviewCommitOriginalAndDuplicate() throws Exception {
