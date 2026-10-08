@@ -5,7 +5,7 @@ import { ApiError, http } from '../../api/http';
 import { useAuth } from '../../stores/AuthContext';
 import { humanizeApiMessage } from '../../utils/apiMessage';
 import { createRequestId } from '../../utils/requestId';
-import type { ImportBatch, ImportKind, ImportRow, Purpose, Tube } from '../../types/experiments';
+import type { ImportBatch, ImportKind, ImportRow, Mapping, Purpose, Tube } from '../../types/experiments';
 import {
   CommandFeedback,
   errorText,
@@ -32,11 +32,15 @@ const kindNames = {
 };
 export function ImportsPanel({
   projectId,
+  projectCode,
+  mappings,
   purposes,
   tubes,
   refresh,
 }: {
   projectId: number;
+  projectCode: string;
+  mappings: Mapping[];
   purposes: Purpose[];
   tubes: Tube[];
   refresh: () => Promise<void>;
@@ -213,7 +217,23 @@ export function ImportsPanel({
       <Alert
         type="info"
         message="分组表固定三列：试验编号、动物号、芯片号。采血与分装表固定五列：试验编号、动物号、时间点、管标信息、采样日期。每行是一支管，支持 xls / xlsx，上限 8 MB。"
+        description={
+          <div>
+            <p>附件中的试验编号必须为 {projectCode}</p>
+            <p>准备顺序：确认分组表 → 设置用途配对 → 确认采血管表 → 确认分装管表。上传预览后还需要点击确认，才会正式导入。</p>
+            <p>日期支持Excel日期，以及2026-08-20、2026.08.20、2026/08/20等年在前的文本，导入后统一为2026-08-20。</p>
+          </div>
+        }
       />
+      {kind !== 'GROUP' && !mappings.some((m) => m.active) && (
+        <Alert type="warning" message="当前实验尚无有效分组，请先上传分组表并确认导入。" />
+      )}
+      {kind !== 'GROUP' && !purposes.some((p) => p.active && p.confirmed) && (
+        <Alert type="warning" message="当前实验尚无已确认用途，请先在“用途配对”中设置。" />
+      )}
+      {kind === 'ALIQUOT' && !tubes.some((t) => t.kind === 'COLLECTION' && t.status === 'ACTIVE' && t.confirmed) && (
+        <Alert type="warning" message="当前实验尚无已确认采血管，请先完成采血管表导入，再导入分装管表。" />
+      )}
       <Space wrap>
         <NativeSelect
           label="附件类型"
@@ -410,6 +430,12 @@ export function ImportsPanel({
                 onClick={applyBulk}
               >
                 应用到选中行（{selected.length}）
+              </Button>
+              <Button disabled={busy} onClick={() => setSelected(batch.rows.map((r) => r.rowKey))}>
+                选择本批全部{batch.rows.length}行
+              </Button>
+              <Button disabled={busy || !selected.length} onClick={() => setSelected([])}>
+                清空选择
               </Button>
               <Input.Search
                 placeholder="按动物或管标筛选后勾选"

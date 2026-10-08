@@ -593,6 +593,40 @@ test('导入错误指出附件工作表行列，禁止部分提交', async ({ pa
   await expect(page.getByTestId('import-issues')).toContainText('4');
   await expect(page.getByRole('button', { name: '确认用途并追加导入' })).toBeDisabled();
 });
+
+test('新实验导入显示编号与分组用途前提', async ({ page }) => {
+  await open(page, 'imports', (path) =>
+    path.endsWith('/mappings') || path.endsWith('/purposes') || path.endsWith('/tubes') ? [] : undefined,
+  );
+  await expect(page.getByText('附件中的试验编号必须为 DEMO-001', { exact: true })).toBeVisible();
+  await expect(page.getByText('当前实验尚无有效分组，请先上传分组表并确认导入。', { exact: true })).toBeVisible();
+  await expect(page.getByText('当前实验尚无已确认用途，请先在“用途配对”中设置。', { exact: true })).toBeVisible();
+  await page.getByLabel('附件类型', { exact: true }).selectOption('GROUP');
+  await expect(page.getByText('当前实验尚无有效分组，请先上传分组表并确认导入。', { exact: true })).not.toBeVisible();
+});
+
+test('导入批量用途能跨页选中全部45行并提交', async ({ page }) => {
+  const rows = Array.from({ length: 45 }, (_, i) => ({
+    ...batch.rows[0], rowKey: `Sheet1:${i + 2}`, sourceRow: i + 2,
+    animalNo: String(i + 1).padStart(3, '0'), suggestedPurposeId: '',
+  }));
+  let submitted: Body | undefined;
+  await open(page, 'imports', (path, body) => {
+    if (path.endsWith('/imports/preview')) return { ...batch, rows };
+    if (path.endsWith('/commit')) {
+      submitted = body;
+      return { ...batch, rows, status: 'COMMITTED' };
+    }
+  });
+  await upload(page);
+  await page.getByRole('button', { name: '选择本批全部45行', exact: true }).click();
+  await page.getByLabel('批量用途', { exact: true }).selectOption('p1');
+  await page.getByRole('button', { name: '应用到选中行（45）', exact: true }).click();
+  await expect(page.getByRole('button', { name: '确认用途并追加导入' })).toBeEnabled();
+  await page.getByRole('button', { name: '确认用途并追加导入' }).click();
+  await expect(page.getByText('已完整导入', { exact: true }).first()).toBeVisible();
+  expect(submitted?.assignments).toEqual(rows.map((r) => ({ rowKey: r.rowKey, purposeId: 'p1' })));
+});
 test('提交409重新取最新疑似重复行，明确追加才新请求提交', async ({ page }) => {
   const commits: Body[] = [];
   let conflict = false;

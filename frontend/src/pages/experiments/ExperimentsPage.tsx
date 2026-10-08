@@ -291,7 +291,9 @@ function Workspace({
                 {activeTab === 'purposes' && (
                   <PurposesPanel projectId={experiment.id} purposes={purposes} refresh={refresh} />
                 )}
-                {activeTab === 'imports' && <ImportsPanel {...props} />}
+                {activeTab === 'imports' && (
+                  <ImportsPanel {...props} projectCode={experiment.projectCode} mappings={mappings} />
+                )}
                 {activeTab === 'collection-tubes' && <TubesPanel {...props} kind="COLLECTION" />}
                 {activeTab === 'aliquot-tubes' && <TubesPanel {...props} kind="ALIQUOT" />}
                 {activeTab === 'print' && <PrintPanel {...props} />}
